@@ -10,4 +10,4 @@ I've added the 2020 input zip file I've been using for Panda in the `panda_input
 The notebook `training_data_metrics` contains code to compare the Panda found matches with the hand labeled training data matches.
 The notebook `preprocessing` contains code to do various preprocessing things like generate the updated plant parts list, make it distinct, add on utility name, etc.
 
-So far Panda is only finding 24 of the 115 labeled matches for 2020. Panda finds around 2800 matches total. I take a deeper look at this in the `training_data_metrics` notebook. I think this low recall is most likely because of NaN values.
+So far Panda is only finding 24 of the 115 hand-labeled matches for 2020. Compared to the baseline model, Panda finds 203 of the 1151 matches found by the baseline model for 2020. Panda finds around 2800 matches total for 2020. I take a deeper look at this in the `training_data_metrics` notebook. I think this low recall is most likely because of NaN values.
