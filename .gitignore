@@ -1,5 +1,9 @@
 .DS_Store
 ferc1_eia_baseline_matches.pkl
+splink_model_settings/
+panda_inputs/
+random_io/
+draft_lfs.py
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
