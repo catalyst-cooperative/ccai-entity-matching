@@ -1,11 +1,14 @@
 """Prepare the FERC and EIA input data for matching according to the needs of the specified entity resolution method."""
 
+import logging
 from typing import List, Literal
 
 import pandas as pd
 
 import pudl
 from ferc_eia_match.helpers import drop_null_cols
+
+logger = logging.getLogger(__name__)
 
 
 def splink_preprocess(df: pd.DataFrame) -> pd.DataFrame:
@@ -83,6 +86,7 @@ class InputManager:
         rename columns to match EIA side, set the index to `record_id_ferc1`,
         and filter to desired report years.
         """
+        logger.info("Creating FERC plants input.")
         fbp_cols_to_use = [
             "report_year",
             "utility_id_ferc1",
@@ -148,9 +152,12 @@ class InputManager:
             lambda x: x.str.strip().str.lower()
         )
         # apply tool specific preprocessing
-        plants_ferc1_df = LINKER_PREPROCESS_FUNCS[self.linking_tool]["ferc"](
-            plants_ferc1_df
-        )
+        if self.linking_tool in LINKER_PREPROCESS_FUNCS:
+            plants_ferc1_df = LINKER_PREPROCESS_FUNCS[self.linking_tool]["ferc"](
+                plants_ferc1_df
+            )
+        else:
+            logger.info(f"No preprocess function specified for {self.linking_tool}.")
 
         return plants_ferc1_df
 
@@ -163,6 +170,7 @@ class InputManager:
         Make the EIA plant parts distinct, filter by report year and plant part,
         add on utlity name.
         """
+        logger.info("Creating the EIA plant parts list input.")
         plant_parts_eia = self.pudl_out.plant_parts_eia()
         # a little patch, this might not be needed anymore
         plant_parts_eia = plant_parts_eia[
@@ -214,8 +222,11 @@ class InputManager:
         plant_parts_eia[str_cols] = plant_parts_eia[str_cols].apply(
             lambda x: x.str.strip().str.lower()
         )
-        plant_parts_eia = LINKER_PREPROCESS_FUNCS[self.linking_tool]["eia"](
-            plant_parts_eia
-        )
+        if self.linking_tool in LINKER_PREPROCESS_FUNCS:
+            plant_parts_eia = LINKER_PREPROCESS_FUNCS[self.linking_tool]["eia"](
+                plant_parts_eia
+            )
+        else:
+            logger.info(f"No preprocess function specified for {self.linking_tool}.")
 
         return plant_parts_eia
