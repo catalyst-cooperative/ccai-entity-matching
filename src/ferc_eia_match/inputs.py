@@ -5,6 +5,39 @@ from typing import List, Literal
 import pandas as pd
 
 import pudl
+from ferc_eia_match.helpers import drop_null_cols
+
+
+def splink_preprocess(df: pd.DataFrame) -> pd.DataFrame:
+    """Prepare EIA and FERC data for matching with splink.
+
+    Dataframe should have ``record_id_eia`` or ``record_id_ferc1`` as the index.
+    """
+    df = drop_null_cols(df, threshold=0.8)
+    # need to make the record id index a column for splink to have a unique id col
+    df["record_id"] = df.index
+    # keep all cols for now
+    """
+    splink_cols = [
+        "report_year",
+        "plant_name",
+        "utility_name",
+        "installation_year",
+        "construction_year",
+        "capacity_mw",
+        "fuel_type_code_pudl",
+        "utility_id_pudl",
+        "plant_id_pudl",
+    ]
+    df = df[splink_cols]
+    """
+    return df
+
+
+# the preprocessing function to use for the EIA and FERC datasets for each linking tool
+LINKER_PREPROCESS_FUNCS = {
+    "splink": {"eia": splink_preprocess, "ferc": splink_preprocess}
+}
 
 
 class InputManager:
@@ -13,7 +46,7 @@ class InputManager:
     def __init__(
         self,
         pudl_out: pudl.output.pudltabl.PudlTabl,
-        matching_tool: Literal["panda", "splink"] = "panda",
+        linking_tool: Literal["panda", "splink"] = "panda",
         report_years: List[int] | None = None,
         eia_plant_part: str | None = None,
     ) -> None:
@@ -21,7 +54,7 @@ class InputManager:
 
         Args:
             pudl_out: PUDL output object to retrieve FERC 1 data.
-            matching_tool: The tool that will be used for matching. The idea is
+            linking_tool: The tool that will be used for matching. The idea is
                 to use this parameter for specific tool dependent filtering/cleaning
                 that needs to happen. Maybe it won't be needed.
             report_years: A list of the report years to filter the data to. Year values
@@ -30,8 +63,8 @@ class InputManager:
                 and all plant parts will be included in the EIA data.
         """
         self.pudl_out = pudl_out
-        # TODO: need matching_tool?
-        self.matching_tool = matching_tool
+        # TODO: need linking_tool?
+        self.linking_tool = linking_tool
         self.report_years = report_years
         if (
             eia_plant_part is not None
@@ -91,11 +124,34 @@ class InputManager:
                     "utility_name_ferc1": "utility_name",
                 }
             )
+            .astype(
+                {
+                    "plant_name": "string",
+                    "utility_name": "string",
+                    "fuel_type_code_pudl": "string",
+                    "installation_year": "Int64",
+                    "construction_year": "Int64",
+                    "capacity_mw": "float64",
+                }
+            )
             .set_index("record_id_ferc1")
         )
         plants_ferc1_df = plants_ferc1_df[
             plants_ferc1_df.report_year.isin(self.report_years)
         ]
+        # nullify negative capacity and round values
+        plants_ferc1_df.loc[plants_ferc1_df.capacity_mw <= 0, "capacity_mw"] = None
+        plants_ferc1_df = plants_ferc1_df.round({"capacity_mw": 2})
+        # basic string cleaning
+        str_cols = ["utility_name", "plant_name"]
+        plants_ferc1_df[str_cols] = plants_ferc1_df[str_cols].apply(
+            lambda x: x.str.strip().str.lower()
+        )
+        # apply tool specific preprocessing
+        plants_ferc1_df = LINKER_PREPROCESS_FUNCS[self.linking_tool]["ferc"](
+            plants_ferc1_df
+        )
+
         return plants_ferc1_df
 
     def get_eia_input(self) -> pd.DataFrame:
@@ -124,9 +180,9 @@ class InputManager:
             plant_parts_eia.plant_part == self.eia_plant_part
         ]
         # add on utility name
-        # are these tables the same?
-        # eia_util = pd.read_sql("utilities_eia", pudl_engine)
-        eia_util = self.pudl_out.utils_eia860()
+        # use entity table or glue table for utility names?
+        eia_util = pd.read_sql("utilities_eia", self.pudl_out.pudl_engine)
+        # eia_util = self.pudl_out.utils_eia860()
         eia_util = eia_util.set_index("utility_id_eia")["utility_name_eia"]
         non_null_df = plant_parts_eia[~(plant_parts_eia.utility_id_eia.isnull())]
         non_null_df = non_null_df.merge(
@@ -139,5 +195,27 @@ class InputManager:
         plant_parts_eia = pd.concat(
             [non_null_df, plant_parts_eia[plant_parts_eia.utility_id_eia.isnull()]]
         ).reindex(plant_parts_eia.index)
+        plant_parts_eia = plant_parts_eia.astype(
+            {
+                "plant_name": "string",
+                "utility_name": "string",
+                "fuel_type_code_pudl": "string",
+                "technology_description": "string",
+                "installation_year": "Int64",
+                "construction_year": "Int64",
+                "capacity_mw": "float64",
+            }
+        )
+        # nullify negative capacity and round values
+        plant_parts_eia.loc[plant_parts_eia.capacity_mw <= 0, "capacity_mw"] = None
+        plant_parts_eia = plant_parts_eia.round({"capacity_mw": 2})
+        # basic string cleaning
+        str_cols = ["utility_name", "plant_name"]
+        plant_parts_eia[str_cols] = plant_parts_eia[str_cols].apply(
+            lambda x: x.str.strip().str.lower()
+        )
+        plant_parts_eia = LINKER_PREPROCESS_FUNCS[self.linking_tool]["eia"](
+            plant_parts_eia
+        )
 
         return plant_parts_eia
