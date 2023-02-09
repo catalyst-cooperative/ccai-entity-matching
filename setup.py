@@ -34,7 +34,7 @@ setup(
     # In order for the dependabot to update versions, they must be listed here.
     # Use the format pkg_name>=x,<y"
     install_requires=[
-        "pandas>=1.4,<1.5.3",
+        "pandas>=1.4,<1.5.4",
         "sqlalchemy>=1.4,<2.0.3",
         "catalystcoop-pudl @ git+https://github.com/catalyst-cooperative/pudl@dev",
         "splink",
