@@ -46,7 +46,9 @@ Note: With aggregation methods, order is not considered: "Generator 10" has the 
 
 - LSTM or RNN: Used in DeepER (Ebraheem, Thirumuruganathan). Considers the order of words as well as the order and relationship of attributes in a tuple.
 
-- Self-Reproduction: Autoencoder or seq2seq. From "Deep Learning for Blocking in Entity Matching: A Design Space Exploration" (Thirumuruganathan, Li)
+- Self-Reproduction: Autoencoder or seq2seq. 
+
+From "Deep Learning for Blocking in Entity Matching: A Design Space Exploration" (Thirumuruganathan, Li):
 
 _Roughly speaking, they take a tuple t, feed it into a neural network (NN) to output a compact embedding vector u<sub>t</sub>, such that if we feed u<sub>t</sub> into a second NN, we can recover the original tuple t (or a good approximation of t). If this happens, u<sub>t</sub> can be viewed as a good compact summary of tuple t, and can be used as the tuple
 embedding of t._
