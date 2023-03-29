@@ -24,5 +24,8 @@ __projecturl__ = "https://github.com/catalyst-cooperative/ferc_eia_match"
 __downloadurl__ = "https://github.com/catalyst-cooperative/ferc_eia_match"
 
 # Create a root logger for use anywhere within the package.
-logger = logging.getLogger(__name__)
+logging.basicConfig(level="INFO")
+logger = logging.getLogger("ferc_eia_match")
+log_format = "%(asctime)s [%(levelname)8s] %(name)s:%(lineno)s %(message)s"
+
 logger.addHandler(logging.NullHandler())

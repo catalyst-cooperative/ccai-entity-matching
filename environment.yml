@@ -26,6 +26,3 @@ dependencies:
   # Use pip to install the package defined by this repo for development:
   - pip:
       - --editable ./[dev,docs,tests,types]
-      - flyingsquid # this is a temporary dependency and isn't maintained
-      - snorkel>=0.9.0 # not sure if this will get used
-      - splink # not sure if this will get used

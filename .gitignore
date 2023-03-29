@@ -1,4 +1,5 @@
 .DS_Store
+scratch_notebooks/
 ferc1_eia_baseline_matches.pkl
 splink_model_settings/
 panda_inputs/

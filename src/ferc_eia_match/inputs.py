@@ -3,6 +3,7 @@
 import logging
 from typing import List, Literal
 
+import financial_entity_cleaner
 import pandas as pd
 
 import pudl
@@ -66,9 +67,16 @@ class InputManager:
                 and all plant parts will be included in the EIA data.
         """
         self.pudl_out = pudl_out
+        self.pudl_out.freq = "AS"
         # TODO: need linking_tool?
         self.linking_tool = linking_tool
+        # company name string cleaner, currently uses default rules
+        self.utility_cleaner = financial_entity_cleaner.text.name.CompanyNameCleaner()
         self.report_years = report_years
+        self.plant_parts_eia = None
+        if self.report_years:
+            self.pudl_out.start_date = str(min(self.report_years)) + "-01-01"
+            self.pudl_out.end_date = str(max(self.report_years)) + "-12-31"
         if (
             eia_plant_part is not None
             and eia_plant_part not in pudl.analysis.plant_parts_eia.PLANT_PARTS
@@ -125,13 +133,12 @@ class InputManager:
                     "opex_fuel_per_mwh": "fuel_cost_per_mwh",
                     "primary_fuel_by_mmbtu": "fuel_type_code_pudl",
                     "plant_name_ferc1": "plant_name",  # rename so column names match EIA side
-                    "utility_name_ferc1": "utility_name",
                 }
             )
             .astype(
                 {
                     "plant_name": "string",
-                    "utility_name": "string",
+                    "utility_name_ferc1": "string",
                     "fuel_type_code_pudl": "string",
                     "installation_year": "Int64",
                     "construction_year": "Int64",
@@ -147,21 +154,23 @@ class InputManager:
         plants_ferc1_df.loc[plants_ferc1_df.capacity_mw <= 0, "capacity_mw"] = None
         plants_ferc1_df = plants_ferc1_df.round({"capacity_mw": 2})
         # basic string cleaning
-        str_cols = ["utility_name", "plant_name"]
+        str_cols = ["utility_name_ferc1", "plant_name"]
         plants_ferc1_df[str_cols] = plants_ferc1_df[str_cols].apply(
             lambda x: x.str.strip().str.lower()
         )
+        plants_ferc1_df = self.utility_cleaner.get_clean_df(
+            plants_ferc1_df, "utility_name_ferc1", "utility_name"
+        )
         # apply tool specific preprocessing
         if self.linking_tool in LINKER_PREPROCESS_FUNCS:
+            logger.info(f"Applying preprocess function for {self.linking_tool}.")
             plants_ferc1_df = LINKER_PREPROCESS_FUNCS[self.linking_tool]["ferc"](
                 plants_ferc1_df
             )
-        else:
-            logger.info(f"No preprocess function specified for {self.linking_tool}.")
 
         return plants_ferc1_df
 
-    def get_eia_input(self) -> pd.DataFrame:
+    def get_eia_input(self, update: bool = False) -> pd.DataFrame:
         """Get the distinct EIA plant parts list from PUDL and prepare for matching.
 
         The distinct plant parts list includes only the true granularities of plant part
@@ -171,7 +180,9 @@ class InputManager:
         add on utlity name.
         """
         logger.info("Creating the EIA plant parts list input.")
-        plant_parts_eia = self.pudl_out.plant_parts_eia()
+        plant_parts_eia = self.pudl_out.plant_parts_eia(
+            update=update, update_gens_mega=update
+        )
         # a little patch, this might not be needed anymore
         plant_parts_eia = plant_parts_eia[
             ~plant_parts_eia.index.duplicated(keep="first")
@@ -180,15 +191,13 @@ class InputManager:
         plant_parts_eia = plant_parts_eia[
             (plant_parts_eia["true_gran"]) & (~plant_parts_eia["ownership_dupe"])
         ]
-        # filter by plant part and report years
-        plant_parts_eia = plant_parts_eia[
-            plant_parts_eia.report_year.isin(self.report_years)
-        ]
-        plant_parts_eia = plant_parts_eia[
-            plant_parts_eia.plant_part == self.eia_plant_part
-        ]
+        # filter by plant part
+        if self.eia_plant_part:
+            plant_parts_eia = plant_parts_eia[
+                plant_parts_eia.plant_part == self.eia_plant_part
+            ]
         # add on utility name
-        # use entity table or glue table for utility names?
+        # TODO: use entity table or glue table for utility names?
         eia_util = pd.read_sql("utilities_eia", self.pudl_out.pudl_engine)
         # eia_util = self.pudl_out.utils_eia860()
         eia_util = eia_util.set_index("utility_id_eia")["utility_name_eia"]
@@ -203,10 +212,13 @@ class InputManager:
         plant_parts_eia = pd.concat(
             [non_null_df, plant_parts_eia[plant_parts_eia.utility_id_eia.isnull()]]
         ).reindex(plant_parts_eia.index)
-        plant_parts_eia = plant_parts_eia.astype(
+        # utility_name_eia will be renamed in company name cleaning step
+        plant_parts_eia = plant_parts_eia.rename(
+            columns={"plant_name_eia": "plant_name"}
+        ).astype(
             {
                 "plant_name": "string",
-                "utility_name": "string",
+                "utility_name_eia": "string",
                 "fuel_type_code_pudl": "string",
                 "technology_description": "string",
                 "installation_year": "Int64",
@@ -218,15 +230,18 @@ class InputManager:
         plant_parts_eia.loc[plant_parts_eia.capacity_mw <= 0, "capacity_mw"] = None
         plant_parts_eia = plant_parts_eia.round({"capacity_mw": 2})
         # basic string cleaning
-        str_cols = ["utility_name", "plant_name"]
+        str_cols = ["utility_name_eia", "plant_name"]
         plant_parts_eia[str_cols] = plant_parts_eia[str_cols].apply(
             lambda x: x.str.strip().str.lower()
         )
+        plant_parts_eia = self.utility_cleaner.get_clean_df(
+            plant_parts_eia, "utility_name_eia", "utility_name"
+        )
         if self.linking_tool in LINKER_PREPROCESS_FUNCS:
+            logger.info(f"Applying preprocess function for {self.linking_tool}.")
             plant_parts_eia = LINKER_PREPROCESS_FUNCS[self.linking_tool]["eia"](
                 plant_parts_eia
             )
-        else:
-            logger.info(f"No preprocess function specified for {self.linking_tool}.")
+        self.plant_parts_eia = plant_parts_eia
 
-        return plant_parts_eia
+        return self.plant_parts_eia
