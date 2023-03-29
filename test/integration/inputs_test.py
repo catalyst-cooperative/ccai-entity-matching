@@ -30,3 +30,10 @@ def test_ferc_input(pudl_out: PudlTabl) -> None:
     ferc_df = InputManager(pudl_out=pudl_out, report_years=[2020]).get_ferc_input()
     if ferc_df.empty:
         raise AssertionError("FERC input dataframe is empty.")
+
+
+def test_eia_input(pudl_out: PudlTabl) -> None:
+    """Test that the EIA input data can be created."""
+    eia_df = InputManager(pudl_out=pudl_out, eport_years=[2020]).get_eia_input()
+    if eia_df.empty:
+        raise AssertionError("EIA input dataframe is empty.")
