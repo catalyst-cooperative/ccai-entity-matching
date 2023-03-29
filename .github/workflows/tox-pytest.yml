@@ -22,7 +22,7 @@ jobs:
           channels: conda-forge,defaults
           channel-priority: true
           python-version: "3.10"
-          activate-environment: energy_comms
+          activate-environment: ferc_eia_match
           environment-file: environment.yml
       - shell: bash -l {0}
         run: |
@@ -43,18 +43,18 @@ jobs:
         run: |
           mkdir -p ~/pudl-work/sqlite/
           if [ ! -f ~/pudl-work/sqlite/pudl.sqlite ]
-          then curl -o ~/pudl-work/sqlite/pudl.sqlite https://data.catalyst.coop/pudl.db
+          then curl -o ~/pudl-work/sqlite/pudl.sqlite http://intake.catalyst.coop.s3.amazonaws.com/dev/pudl.sqlite
           fi
           find ~/pudl-work/
 
       - name: Log SQLite3 version
         run: |
-          conda run -n energy_comms which sqlite3
-          conda run -n energy_comms sqlite3 --version
+          conda run -n ferc_eia_match which sqlite3
+          conda run -n ferc_eia_match sqlite3 --version
 
       - name: Run PyTest with Tox
         run: |
-          conda run -n energy_comms tox
+          conda run -n ferc_eia_match tox
 
       - name: Upload test coverage report to CodeCov
         uses: codecov/codecov-action@v3.1.1
