@@ -3,7 +3,7 @@
 import logging
 from typing import List, Literal
 
-import financial_entity_cleaner
+# import financial_entity_cleaner
 import pandas as pd
 
 import pudl
@@ -71,7 +71,7 @@ class InputManager:
         # TODO: need linking_tool?
         self.linking_tool = linking_tool
         # company name string cleaner, currently uses default rules
-        self.utility_cleaner = financial_entity_cleaner.text.name.CompanyNameCleaner()
+        # self.utility_cleaner = financial_entity_cleaner.text.name.CompanyNameCleaner()
         self.report_years = report_years
         self.plant_parts_eia = None
         if self.report_years:
@@ -158,9 +158,12 @@ class InputManager:
         plants_ferc1_df[str_cols] = plants_ferc1_df[str_cols].apply(
             lambda x: x.str.strip().str.lower()
         )
+        """
+        # comment this out for now, use different package
         plants_ferc1_df = self.utility_cleaner.get_clean_df(
             plants_ferc1_df, "utility_name_ferc1", "utility_name"
         )
+        """
         # apply tool specific preprocessing
         if self.linking_tool in LINKER_PREPROCESS_FUNCS:
             logger.info(f"Applying preprocess function for {self.linking_tool}.")
@@ -234,9 +237,12 @@ class InputManager:
         plant_parts_eia[str_cols] = plant_parts_eia[str_cols].apply(
             lambda x: x.str.strip().str.lower()
         )
+        """
+        # use different package
         plant_parts_eia = self.utility_cleaner.get_clean_df(
             plant_parts_eia, "utility_name_eia", "utility_name"
         )
+        """
         if self.linking_tool in LINKER_PREPROCESS_FUNCS:
             logger.info(f"Applying preprocess function for {self.linking_tool}.")
             plant_parts_eia = LINKER_PREPROCESS_FUNCS[self.linking_tool]["eia"](

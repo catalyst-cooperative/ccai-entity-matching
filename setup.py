@@ -30,7 +30,7 @@ setup(
     license="MIT",
     # Fill in search keywords that users might use to find the package
     keywords=[],
-    python_requires=">=3.10,<3.12",
+    python_requires=">=3.11,<3.12",
     # In order for the dependabot to update versions, they must be listed here.
     # Use the format pkg_name>=x,<y"
     install_requires=[
@@ -38,9 +38,7 @@ setup(
         "sqlalchemy>=1.4,<2.0.8",
         "catalystcoop-pudl @ git+https://github.com/catalyst-cooperative/pudl@dev",
         "splink>=3.7.2,<4.0",
-        "financial-entity-cleaner>=0.2.0,<1.0",
-        "flyingsquid",  # this is a temporary dependency and isn't maintained
-        "snorkel>=0.9.0",
+        # "financial-entity-cleaner>=0.2.0,<1.0",
     ],
     extras_require={
         "dev": [

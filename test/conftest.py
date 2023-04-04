@@ -1,4 +1,5 @@
 """PyTest configuration module. Defines useful fixtures, command line args."""
+import json
 import logging
 import os
 from pathlib import Path
@@ -8,7 +9,6 @@ import pytest
 import sqlalchemy as sa
 
 import pudl
-from pudl.output.pudltabl import PudlTabl
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,20 @@ def test_dir() -> Path:
 
 
 @pytest.fixture(scope="session")
-def pudl_settings_fixture() -> Any:  # noqa: C901
+def pudl_input_dir() -> dict[Any, Any]:
+    """Determine where the PUDL input/output dirs should be."""
+    input_override = None
+
+    # In CI we want a hard-coded path for input caching purposes:
+    if os.environ.get("GITHUB_ACTIONS", False):
+        # hard-code input dir for CI caching
+        input_override = Path(os.environ["HOME"]) / "pudl-work/data"
+
+    return {"input_dir": input_override}
+
+
+@pytest.fixture(scope="session")
+def pudl_settings_fixture(request) -> Any:  # type: ignore
     """Determine some settings for the test session.
 
     * On a user machine, it should use their existing PUDL_DIR.
@@ -49,35 +62,15 @@ def pudl_settings_fixture() -> Any:  # noqa: C901
       downloaded PUDL DB.
     """
     logger.info("setting up the pudl_settings_fixture")
+    pudl_settings = pudl.workspace.setup.get_defaults(**pudl_input_dir)
+    pudl.workspace.setup.init(pudl_settings)
 
-    # In CI we want a hard-coded path for input caching purposes:
-    if os.environ.get("GITHUB_ACTIONS", False):
-        pudl_out = Path(os.environ["HOME"]) / "pudl-work"
-        pudl_in = pudl_out
-    # Otherwise, default to the user's existing datastore:
-    else:
-        try:
-            defaults = pudl.workspace.setup.get_defaults()
-        except FileNotFoundError as err:
-            logger.critical("Could not identify PUDL_IN / PUDL_OUT.")
-            raise err
-        pudl_out = defaults["pudl_out"]
-        pudl_in = defaults["pudl_in"]
+    pudl_settings["sandbox"] = request.config.getoption("--sandbox")
 
-    # Set these environment variables for future reference...
-    logger.info("Using PUDL_IN=%s", pudl_in)
-    os.environ["PUDL_IN"] = str(pudl_in)
-    logger.info("Using PUDL_OUT=%s", pudl_out)
-    os.environ["PUDL_OUT"] = str(pudl_out)
-
-    # Build all the pudl_settings paths:
-    pudl_settings = pudl.workspace.setup.derive_paths(
-        pudl_in=pudl_in, pudl_out=pudl_out
+    pretty_settings = json.dumps(
+        {str(k): str(v) for k, v in pudl_settings.items()}, indent=2
     )
-    # Set up the pudl workspace:
-    pudl.workspace.setup.init(pudl_in=pudl_in, pudl_out=pudl_out)
-
-    logger.info("pudl_settings being used: %s", pudl_settings)
+    logger.info(f"pudl_settings being used: {pretty_settings}")
     return pudl_settings
 
 
@@ -92,9 +85,3 @@ def pudl_engine_fixture(pudl_settings_fixture: dict[Any, Any]) -> sa.engine.Engi
     engine = sa.create_engine(pudl_settings_fixture["pudl_db"])
     logger.info("PUDL Engine: %s", engine)
     return engine
-
-
-@pytest.fixture(scope="session", name="pudl_out")
-def pudl_out_fixture(pudl_engine: sa.engine.Engine) -> PudlTabl:
-    """Define PudlTabl output object fixture."""
-    return PudlTabl(pudl_engine=pudl_engine, freq="AS")
