@@ -11,16 +11,16 @@ The simplest way we tried to create blocks of candidate pairs is with rule based
 It's worth noting that the output of rule based blocking can be combined with the output of an embedding vector approach described below to increase recall, while increasing the blocking output size only modestly (Thirumuruganathan, Li).
 
 ### Distributed Representations for Blocking
-Instead of creating heuristics for blocking, we can create embedding vectors that represent the tuples in the FERC and EIA datasets and find the most similar pairs of embedding vectors to create a candidate set. This process involves three main steps.  
+Instead of creating heuristics for blocking, we can create embedding vectors that represent the tuples in the FERC and EIA datasets and find the most similar pairs of embedding vectors to create a candidate set. This process involves three main steps.
 1. Attribute Embedding: For each tuple `t` in the FERC and EIA datasets, compute an embedding vector for each attribute (column) in `t`. This can sometimes involve vectorizing each individual word or n-gram within an attribute, and then combining them into one attribute embedding.
 2. Tuple Embedding: Combine each attribute embedding vector into one embedding vector for the tuple `t`.
 3. Vector Pairing: Find similar vector pairs from the FERC and EIA datasets using a similarity metric and add the tuple pairs represented by these embedding vectors to the candidate set.
 
 **Word and Attribute Embeddings**
 
-There are multiple methods for embedding the string value attributes of the tuples. 
+There are multiple methods for embedding the string value attributes of the tuples.
 
-- TF-IDF: 
+- TF-IDF:
   - Vectorizes based on the occurrence of words in the domain
   - Can't control the output dimension of the embeddings
 
@@ -46,7 +46,7 @@ Note: With aggregation methods, order is not considered: "Generator 10" has the 
 
 - LSTM or RNN: Used in DeepER (Ebraheem, Thirumuruganathan). Considers the order of words as well as the order and relationship of attributes in a tuple.
 
-- Self-Reproduction: Autoencoder or seq2seq. 
+- Self-Reproduction: Autoencoder or seq2seq.
 
 From "Deep Learning for Blocking in Entity Matching: A Design Space Exploration" (Thirumuruganathan, Li):
 
