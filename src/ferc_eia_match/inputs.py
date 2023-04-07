@@ -3,11 +3,11 @@
 import logging
 from typing import List, Literal
 
-# import financial_entity_cleaner
 import pandas as pd
 
 import pudl
 from ferc_eia_match.helpers import drop_null_cols
+from ferc_eia_match.name_cleaner import CompanyNameCleaner
 
 logger = logging.getLogger(__name__)
 
@@ -71,12 +71,16 @@ class InputManager:
         # TODO: need linking_tool?
         self.linking_tool = linking_tool
         # company name string cleaner, currently uses default rules
-        # self.utility_cleaner = financial_entity_cleaner.text.name.CompanyNameCleaner()
+        self.utility_cleaner = CompanyNameCleaner()
         self.report_years = report_years
         self.plant_parts_eia = None
         if self.report_years:
-            self.pudl_out.start_date = str(min(self.report_years)) + "-01-01"
-            self.pudl_out.end_date = str(max(self.report_years)) + "-12-31"
+            self.pudl_out.start_date = pd.to_datetime(
+                str(min(self.report_years)) + "-01-01"
+            )
+            self.pudl_out.end_date = pd.to_datetime(
+                str(max(self.report_years)) + "-12-31"
+            )
         if (
             eia_plant_part is not None
             and eia_plant_part not in pudl.analysis.plant_parts_eia.PLANT_PARTS
@@ -88,7 +92,6 @@ class InputManager:
     def get_ferc_input(self) -> pd.DataFrame:
         """Get the FERC 1 plants data from PUDL and prepare for matching.
 
-        Function adapted from RMI and Catalyst EIA and FERC repo.
         Merge FERC 1 fuel usage by plant attributes onto all FERC 1 plant records,
         add potentially helpful comparison attributes like `installation_year`,
         rename columns to match EIA side, set the index to `record_id_ferc1`,
@@ -158,12 +161,10 @@ class InputManager:
         plants_ferc1_df[str_cols] = plants_ferc1_df[str_cols].apply(
             lambda x: x.str.strip().str.lower()
         )
-        """
-        # comment this out for now, use different package
         plants_ferc1_df = self.utility_cleaner.get_clean_df(
             plants_ferc1_df, "utility_name_ferc1", "utility_name"
         )
-        """
+
         # apply tool specific preprocessing
         if self.linking_tool in LINKER_PREPROCESS_FUNCS:
             logger.info(f"Applying preprocess function for {self.linking_tool}.")
@@ -237,12 +238,9 @@ class InputManager:
         plant_parts_eia[str_cols] = plant_parts_eia[str_cols].apply(
             lambda x: x.str.strip().str.lower()
         )
-        """
-        # use different package
         plant_parts_eia = self.utility_cleaner.get_clean_df(
             plant_parts_eia, "utility_name_eia", "utility_name"
         )
-        """
         if self.linking_tool in LINKER_PREPROCESS_FUNCS:
             logger.info(f"Applying preprocess function for {self.linking_tool}.")
             plant_parts_eia = LINKER_PREPROCESS_FUNCS[self.linking_tool]["eia"](
