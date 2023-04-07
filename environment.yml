@@ -19,7 +19,7 @@ dependencies:
 
   # Jupyter packages:
   - jupyterlab>=3.2,<3.7 # need to enforce 3.2 for splink, change later
-  - nbconvert>=6,<7 # Used to clear notebook outputs in pre-commit hooks
+  - nbconvert>=7,<8 # Used to clear notebook outputs in pre-commit hooks
 
   # Use pip to install the package defined by this repo for development:
   - pip:
