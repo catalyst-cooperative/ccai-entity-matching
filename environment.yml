@@ -4,9 +4,9 @@ channels:
   - defaults
 dependencies:
   # Packages required for setting up the environment
-  - pip>=21,<23
+  - pip>=21,<24
   - python>=3.11,<3.12
-  - setuptools<66
+  - setuptools<68
 
   # Tricky binary dependencies, best resolved w/ conda:
   # - geopandas>=0.9,<0.11
@@ -14,8 +14,6 @@ dependencies:
   - python-snappy>=0.6,<1 # Ensures snappy-dev library gets installed
   # - numba>=0.56.1,<0.57 # not strictly necessary, but speeds some things up by 100x
   - sqlite>=3.36,<4 # Required by PUDL 0.5.0 and later.
-
-  - pgmpy # move to setup later if used
 
   - nodejs # Useful for Jupyter and prettier pre-commit hook
 
