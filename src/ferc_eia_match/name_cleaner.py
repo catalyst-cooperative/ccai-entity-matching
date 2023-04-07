@@ -111,15 +111,14 @@ class CompanyNameCleaner:
     __NAME_JSON_ENTRY_LEGAL_TERMS = "legal_forms"
 
     def __init__(self) -> None:
-        """
-        Constructor method.
+        """Constructor method.
 
         Parameters:
             No parameters are needed.
+
         Returns:
             CountryCleaner (object)
         """
-
         # The dictionary of cleaning rules define which regex functions to apply to the data
         # A default set of regex rules is defined, but it can be changed by the user.
         self._dict_cleaning_rules = CLEANING_RULES_DICT
@@ -153,9 +152,10 @@ class CompanyNameCleaner:
     def _apply_regex_rules(
         self, str_value: str, dict_regex_rules: dict[str, list[str]]
     ) -> str:
-        """
-        Applies several cleaning rules based on a custom dictionary sent by parameter. The dictionary must contain
-        cleaning rules written in regex format.
+        """Applies several cleaning rules based on a custom dictionary sent by parameter.
+
+        The dictionary must contain cleaning rules written in regex format.
+
         Parameters:
             str_value (str): any value as string to be cleaned up.
             dict_regex_rules (dict): a dictionary of cleaning rules writen in regex as shown below:\n
@@ -166,10 +166,10 @@ class CompanyNameCleaner:
                         "remove_email": ["", "[.\\w]@[.\\w]"],
                         "remove_www_address": ["", "https?://[.\\w]{3,}|www.[.\\w]{3,}"]
                 }
+
         Returns:
             (str): the modified/cleaned value.
         """
-
         clean_value = str_value
         # Iterate through the dictionary and apply each regex rule
         for name_rule, cleaning_rule in dict_regex_rules.items():
@@ -262,7 +262,6 @@ class CompanyNameCleaner:
         Returns:
             clean_company_name (str): the clean version of the text's name
         """
-
         if not isinstance(company_name, str):
             raise Exception("f{company_name} is not a string.")
 
@@ -313,7 +312,6 @@ class CompanyNameCleaner:
         Returns:
             df (dataframe): the clean version of the input dataframe
         """
-
         # Check if the company_name attribute exists in the dataframe
         if in_company_name_attribute not in df.columns:
             raise KeyError(f"Column {in_company_name_attribute} not in dataframe.")
