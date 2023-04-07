@@ -36,7 +36,7 @@ setup(
     install_requires=[
         "pandas>=1.4,<1.5.4",
         "sqlalchemy>=1.4,<2.0",
-        "catalystcoop-pudl @ git+https://github.com/catalyst-cooperative/pudl@dev",
+        "catalystcoop-pudl @ git+https://github.com/catalyst-cooperative/pudl@140627f6f6b01cf75e8571dd9beb54244de0c6f3",
         "splink>=3.7.2,<4.0",
     ],
     extras_require={

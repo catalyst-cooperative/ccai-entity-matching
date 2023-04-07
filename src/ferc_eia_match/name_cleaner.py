@@ -2,11 +2,14 @@
 
 import enum
 import json
+import logging
 import os
 import re
 from typing import Any
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 CLEANING_RULES_DICT = {
     "remove_email": [" ", r"\S*@\S*\s?"],
@@ -251,6 +254,9 @@ class CompanyNameCleaner:
     def get_clean_data(self, company_name: str) -> str:
         """Clean a name and normalize legal terms.
 
+        If ``company_name`` is null or not a string value, pd.NA
+        will be returned.
+
         Arguments:
             company_name (str): the original text
 
@@ -258,7 +264,9 @@ class CompanyNameCleaner:
             clean_company_name (str): the clean version of the text
         """
         if not isinstance(company_name, str):
-            raise Exception("f{company_name} is not a string.")
+            if company_name is not pd.NA:
+                logger.warning(f"{company_name} is not a string.")
+            return pd.NA
 
         # Remove all unicode characters in the text's name, if requested
         if self._remove_unicode:

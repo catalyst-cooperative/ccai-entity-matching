@@ -21,6 +21,8 @@ def test_company_name_cleaner() -> None:
                 "Southern   Edison",
                 "Southern_Edison+",
                 r"{Southern} Edison:",
+                pd.NA,
+                0,
             ]
         }
     )
@@ -35,6 +37,8 @@ def test_company_name_cleaner() -> None:
                 "Southern   Edison",
                 "Southern_Edison+",
                 r"{Southern} Edison:",
+                pd.NA,
+                0,
             ],
             "utility_name_clean": ["duke energy limited liability company"] * 4
             + [
@@ -42,6 +46,8 @@ def test_company_name_cleaner() -> None:
                 "southern edison",
                 "southern edison",
                 "southern edison",
+                pd.NA,
+                pd.NA,
             ],
         }
     )
