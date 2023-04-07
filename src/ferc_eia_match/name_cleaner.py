@@ -4,6 +4,7 @@ import enum
 import json
 import os
 import re
+from typing import Any
 
 import pandas as pd
 
@@ -43,6 +44,7 @@ CLEANING_RULES_DICT = {
 DEFAULT_COMPANY_CLEANING_RULES = [
     "replace_amperstand_between_space_by_AND",
     "replace_hyphen_between_spaces_by_single_space",
+    "replace_underscore_by_space",
     "replace_underscore_between_spaces_by_single_space",
     "remove_text_puctuation_except_dot",
     "remove_math_symbols",
@@ -54,7 +56,7 @@ DEFAULT_COMPANY_CLEANING_RULES = [
 ]
 
 
-def load_json_file(file_to_read: str) -> dict[str, str]:
+def load_json_file(file_to_read: str) -> Any:
     """Reads a json file and returns its content as a python dictionary.
 
     Args:
@@ -108,7 +110,7 @@ class CompanyNameCleaner:
     __NAME_LEGAL_TERMS_DICT_FILE = "us_legal_forms.json"
     __NAME_JSON_ENTRY_LEGAL_TERMS = "legal_forms"
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Constructor method.
 
@@ -148,7 +150,9 @@ class CompanyNameCleaner:
         # Define if the letters with accents are replaced with non-accented ones
         self._remove_accents = False
 
-    def _apply_regex_rules(self, str_value, dict_regex_rules):
+    def _apply_regex_rules(
+        self, str_value: str, dict_regex_rules: dict[str, list[str]]
+    ) -> str:
         """
         Applies several cleaning rules based on a custom dictionary sent by parameter. The dictionary must contain
         cleaning rules written in regex format.
@@ -184,8 +188,8 @@ class CompanyNameCleaner:
             # Make sure to use raw string
             regex_rule = rf"{regex_rule}"
 
-            # Threat the special case of the word THE at the end of a text's name
-            found_the_word_the = False
+            # Treat the special case of the word THE at the end of a text's name
+            found_the_word_the = None
             if name_rule == "place_word_the_at_the_beginning":
                 found_the_word_the = re.search(regex_rule, clean_value)
 
@@ -193,12 +197,12 @@ class CompanyNameCleaner:
             clean_value = re.sub(regex_rule, replacement, clean_value)
 
             # Adjust the name for the case of rule <place_word_the_at_the_beginning>
-            if found_the_word_the:
+            if found_the_word_the is not None:
                 clean_value = "the " + clean_value
 
         return clean_value
 
-    def _remove_unicode(self, value):
+    def _remove_unicode_chars(self, value: str) -> str:
         """
         Removes unicode character that is unreadable when converted to ASCII format.
         Parameters:
@@ -210,9 +214,8 @@ class CompanyNameCleaner:
         clean_value = value.encode("ascii", "ignore").decode()
         return clean_value
 
-    def _apply_cleaning_rules(self, company_name):
-        # APPLY THE CLEANING RULES FIRST
-        # Get the custom dictionary of regex rules to be applied in the cleaning
+    def _apply_cleaning_rules(self, company_name: str) -> str:
+        """Apply the cleaning rules, get the custom dictionary of regex rules to apply."""
         cleaning_dict = {}
         for rule_name in self._default_cleaning_rules:
             cleaning_dict[rule_name] = self._dict_cleaning_rules[rule_name]
@@ -221,7 +224,8 @@ class CompanyNameCleaner:
         clean_company_name = self._apply_regex_rules(company_name, cleaning_dict)
         return clean_company_name
 
-    def _apply_normalization_of_legal_terms(self, company_name):
+    def _apply_normalization_of_legal_terms(self, company_name: str) -> str:
+        """Apply the normalization of legal terms according to dictionary of regex rules."""
         # Make sure to remove extra spaces, so legal terms can be found in the end (if requested)
         clean_company_name = company_name.strip()
 
@@ -249,16 +253,14 @@ class CompanyNameCleaner:
                 clean_company_name = re.sub(regex_rule, replacement, clean_company_name)
         return clean_company_name
 
-    def get_clean_data(self, company_name):
-        """
-        This method cleans up a text's name.
+    def get_clean_data(self, company_name: str) -> str:
+        """Clean up a name and normalize legal terms.
 
         Parameters:
             company_name (str): the original text's name
+
         Returns:
             clean_company_name (str): the clean version of the text's name
-        Raises:
-            CompanyNameIsNotAString: when [company_name] is not of a string type
         """
 
         if not isinstance(company_name, str):
@@ -266,7 +268,7 @@ class CompanyNameCleaner:
 
         # Remove all unicode characters in the text's name, if requested
         if self._remove_unicode:
-            clean_company_name = self._remove_unicode(company_name)
+            clean_company_name = self._remove_unicode_chars(company_name)
         else:
             clean_company_name = company_name
 
@@ -296,26 +298,20 @@ class CompanyNameCleaner:
 
     def get_clean_df(
         self,
-        df,
-        in_company_name_attribute,
-        out_company_name_attribute,
-    ):
-        """
-        This method cleans up all text's names in a dataframe by selecting the correspondent dictionary of
-        legal terms according to a country attribute in that dataframe.
+        df: pd.DataFrame,
+        in_company_name_attribute: str,
+        out_company_name_attribute: str,
+    ) -> pd.DataFrame:
+        """Clean up text names in a dataframe.
 
         Parameters:
             df (dataframe): the input dataframe that contains the text's name to be cleaned
-            in_company_name_attribute (str): the attribute in the dataframe for text's name
-            out_company_name_attribute (str): the attribute to be created for the clean version of the text's name
-            merge_legal_terms(bool): this flag indicates if the default dictionary
-                of legal terms should be merged to the new dictionary by coutry,
-                defined as default (by standard, the default is us-english)
+            in_company_name_attribute (str): the attribute in the dataframe that contains then names
+            out_company_name_attribute (str): the attribute to be created for the clean version of
+                the text's name
+
         Returns:
             df (dataframe): the clean version of the input dataframe
-        Raises:
-            CompanyNameNotFoundInDataFrame: when [in_company_name_attribute] is not a dataframe's attribute
-            CountryNotFoundInDataFrame: when [in_country_attribute] is informed and is not a dataframe's attribute
         """
 
         # Check if the company_name attribute exists in the dataframe

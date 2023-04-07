@@ -9,6 +9,7 @@ import pytest
 import sqlalchemy as sa
 
 import pudl
+from pudl.output.pudltabl import PudlTabl
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ def pudl_input_dir() -> dict[Any, Any]:
 
 
 @pytest.fixture(scope="session")
-def pudl_settings_fixture(request) -> Any:  # type: ignore
+def pudl_settings_fixture(request, pudl_input_dir) -> Any:  # type: ignore
     """Determine some settings for the test session.
 
     * On a user machine, it should use their existing PUDL_DIR.
@@ -85,3 +86,9 @@ def pudl_engine_fixture(pudl_settings_fixture: dict[Any, Any]) -> sa.engine.Engi
     engine = sa.create_engine(pudl_settings_fixture["pudl_db"])
     logger.info("PUDL Engine: %s", engine)
     return engine
+
+
+@pytest.fixture(scope="session", name="pudl_out")
+def pudl_out_fixture(pudl_engine: sa.engine.Engine) -> PudlTabl:
+    """Define PudlTabl output object fixture."""
+    return PudlTabl(pudl_engine=pudl_engine, freq="AS")
