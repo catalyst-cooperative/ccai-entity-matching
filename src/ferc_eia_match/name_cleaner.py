@@ -152,20 +152,14 @@ class CompanyNameCleaner:
     def _apply_regex_rules(
         self, str_value: str, dict_regex_rules: dict[str, list[str]]
     ) -> str:
-        """Applies several cleaning rules based on a custom dictionary sent by parameter.
+        r"""Applies several cleaning rules based on a custom dictionary.
 
         The dictionary must contain cleaning rules written in regex format.
 
-        Parameters:
+        Arguments:
             str_value (str): any value as string to be cleaned up.
-            dict_regex_rules (dict): a dictionary of cleaning rules writen in regex as shown below:\n
-                [rule name] : ['replacement', 'regex rule']\n
-                Example of a regex rule dictionary: \n
-                .. code-block:: text
-                {
-                        "remove_email": ["", "[.\\w]@[.\\w]"],
-                        "remove_www_address": ["", "https?://[.\\w]{3,}|www.[.\\w]{3,}"]
-                }
+            dict_regex_rules (dict): a dictionary of cleaning rules writen in regex with the format
+                [rule name] : ['replacement', 'regex rule']
 
         Returns:
             (str): the modified/cleaned value.
@@ -203,10 +197,11 @@ class CompanyNameCleaner:
         return clean_value
 
     def _remove_unicode_chars(self, value: str) -> str:
-        """
-        Removes unicode character that is unreadable when converted to ASCII format.
-        Parameters:
+        """Removes unicode character that is unreadable when converted to ASCII format.
+
+        Arguments:
             value (str): any string containing unicode characters.
+
         Returns:
             (str): the corresponding input string without unicode characters.
         """
@@ -215,7 +210,7 @@ class CompanyNameCleaner:
         return clean_value
 
     def _apply_cleaning_rules(self, company_name: str) -> str:
-        """Apply the cleaning rules, get the custom dictionary of regex rules to apply."""
+        """Apply the cleaning rules from the dictionary of regex rules."""
         cleaning_dict = {}
         for rule_name in self._default_cleaning_rules:
             cleaning_dict[rule_name] = self._dict_cleaning_rules[rule_name]
@@ -254,13 +249,13 @@ class CompanyNameCleaner:
         return clean_company_name
 
     def get_clean_data(self, company_name: str) -> str:
-        """Clean up a name and normalize legal terms.
+        """Clean a name and normalize legal terms.
 
-        Parameters:
-            company_name (str): the original text's name
+        Arguments:
+            company_name (str): the original text
 
         Returns:
-            clean_company_name (str): the clean version of the text's name
+            clean_company_name (str): the clean version of the text
         """
         if not isinstance(company_name, str):
             raise Exception("f{company_name} is not a string.")
@@ -303,7 +298,7 @@ class CompanyNameCleaner:
     ) -> pd.DataFrame:
         """Clean up text names in a dataframe.
 
-        Parameters:
+        Arguments:
             df (dataframe): the input dataframe that contains the text's name to be cleaned
             in_company_name_attribute (str): the attribute in the dataframe that contains then names
             out_company_name_attribute (str): the attribute to be created for the clean version of
