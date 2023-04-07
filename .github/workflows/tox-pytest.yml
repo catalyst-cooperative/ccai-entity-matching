@@ -36,12 +36,12 @@ jobs:
           conda config --show
           printenv | sort
 
-      - name: Cache PUDL DB
-        uses: actions/cache@v3.3.1
-        with:
-          path: ~/pudl-work/output/pudl.sqlite
-          # The last time we deployed Datasette. Update if we redeploy.
-          key: "2022-05-05"
+      # - name: Cache PUDL DB
+      # uses: actions/cache@v3.3.1
+      # with:
+      # path: ~/pudl-work/output/pudl.sqlite
+      # The last time we deployed Datasette. Update if we redeploy.
+      # key: "2022-05-05"
 
       - name: Download PUDL DB and log pre-test PUDL workspace contents
         run: |
