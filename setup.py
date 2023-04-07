@@ -35,10 +35,9 @@ setup(
     # Use the format pkg_name>=x,<y"
     install_requires=[
         "pandas>=1.4,<1.5.4",
-        "sqlalchemy>=1.4,<2.0.8",
+        "sqlalchemy>=1.4,<2.0",
         "catalystcoop-pudl @ git+https://github.com/catalyst-cooperative/pudl@dev",
         "splink>=3.7.2,<4.0",
-        # "financial-entity-cleaner>=0.2.0,<1.0",
     ],
     extras_require={
         "dev": [
