@@ -107,8 +107,6 @@ class CompanyNameCleaner:
     # Constants used internally by the class
     __CURRENT_DIR = os.path.dirname(__file__) or "."
     __CURRENT_MODULE_DIR = os.path.abspath(__CURRENT_DIR)
-    __CURRENT_MODULE_DIR = os.path.abspath(__CURRENT_DIR)
-
     __LEGAL_TERMS_DICT_FOLDER = os.path.join(__CURRENT_MODULE_DIR, "legal_forms")
     __NAME_LEGAL_TERMS_DICT_FILE = "us_legal_forms.json"
     __NAME_JSON_ENTRY_LEGAL_TERMS = "legal_forms"
