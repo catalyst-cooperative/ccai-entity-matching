@@ -75,7 +75,7 @@ class InputManager:
         start_date = None
         end_date = None
         if start_report_year is not None:
-            start_date = str(start_report_year) + "01-01"
+            start_date = str(start_report_year) + "-01-01"
         if end_report_year is not None:
             end_date = str(end_report_year) + "-12-31"
         self.pudl_out = pudl.output.pudltabl.PudlTabl(
