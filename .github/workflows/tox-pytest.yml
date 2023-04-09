@@ -2,6 +2,10 @@ name: tox-pytest
 
 on: [push, pull_request]
 
+env:
+  PUDL_OUTPUT: ~/pudl-work/output/
+  PUDL_INPUT: ~/pudl-work/data/
+
 jobs:
   ci-test:
     runs-on: ubuntu-latest
@@ -21,8 +25,8 @@ jobs:
           mamba-version: "*"
           channels: conda-forge,defaults
           channel-priority: true
-          python-version: "3.10"
-          activate-environment: energy_comms
+          python-version: "3.11"
+          activate-environment: ferc1_eia_match
           environment-file: environment.yml
       - shell: bash -l {0}
         run: |
@@ -32,29 +36,27 @@ jobs:
           conda config --show
           printenv | sort
 
-      - name: Cache PUDL DB
-        uses: actions/cache@v3.3.1
-        with:
-          path: ~/pudl-work/sqlite/pudl.sqlite
-          # The last time we deployed Datasette. Update if we redeploy.
-          key: "2022-05-05"
+      # - name: Cache PUDL DB
+      # uses: actions/cache@v3.3.1
+      # with:
+      # path: ~/pudl-work/output/pudl.sqlite
+      # The last time we deployed Datasette. Update if we redeploy.
+      # key: "2022-05-05"
 
       - name: Download PUDL DB and log pre-test PUDL workspace contents
         run: |
-          mkdir -p ~/pudl-work/sqlite/
-          if [ ! -f ~/pudl-work/sqlite/pudl.sqlite ]
-          then curl -o ~/pudl-work/sqlite/pudl.sqlite https://data.catalyst.coop/pudl.db
-          fi
+          mkdir -p ~/pudl-work/output/
+          curl -o ~/pudl-work/output/pudl.sqlite http://intake.catalyst.coop.s3.amazonaws.com/dev/pudl.sqlite
           find ~/pudl-work/
 
       - name: Log SQLite3 version
         run: |
-          conda run -n energy_comms which sqlite3
-          conda run -n energy_comms sqlite3 --version
+          conda run -n ferc1_eia_match which sqlite3
+          conda run -n ferc1_eia_match sqlite3 --version
 
       - name: Run PyTest with Tox
         run: |
-          conda run -n energy_comms tox
+          conda run -n ferc1_eia_match tox
 
       - name: Upload test coverage report to CodeCov
         uses: codecov/codecov-action@v3.1.1

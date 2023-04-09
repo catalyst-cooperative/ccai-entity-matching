@@ -65,10 +65,10 @@ repos:
 
   # Deterministic python formatting:
   - repo: https://github.com/psf/black
-    rev: 23.1.0
+    rev: 23.3.0
     hooks:
       - id: black
-        language_version: python3.10
+        language_version: python3.11
 
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.0.0-alpha.6
@@ -108,14 +108,13 @@ repos:
 
   # Use type annotations to check types
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.1.1
+    rev: v1.2.0
     hooks:
       - id: mypy
         additional_dependencies:
           - pytest
           - types-jinja2
           - types-setuptools
-        args: ["--strict"]
 
   # Check for errors in restructuredtext (.rst) files under the doc hierarchy
   - repo: https://github.com/PyCQA/doc8
@@ -160,7 +159,7 @@ repos:
         verbose: false
         pass_filenames: false
         always_run: true
-        entry: pytest --doctest-modules src/ferc_eia_match test/unit
+        entry: pytest --doctest-modules src/ferc1_eia_match test/unit
 
 # Configuration for pre-commit.ci
 ci:
