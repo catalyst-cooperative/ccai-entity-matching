@@ -3,8 +3,9 @@
 import enum
 import json
 import logging
-import os
 import re
+from importlib.resources import as_file, files
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -59,20 +60,6 @@ DEFAULT_COMPANY_CLEANING_RULES = [
 ]
 
 
-def load_json_file(file_to_read: str) -> Any:
-    """Reads a json file and returns its content as a python dictionary.
-
-    Args:
-        file_to_read (str): complete path and name of the json file to read.
-
-    Returns:
-        (dict): the content of the json file as a python dictionary.
-    """
-    with open(file_to_read, encoding="utf-8") as json_file:
-        dict_content = json.load(json_file)
-    return dict_content
-
-
 class LegalTermLocation(enum.Enum):
     """The location of the legal terms within the name string."""
 
@@ -105,9 +92,6 @@ class CompanyNameCleaner:
     """
 
     # Constants used internally by the class
-    __CURRENT_DIR = os.path.dirname(__file__) or "."
-    __CURRENT_MODULE_DIR = os.path.abspath(__CURRENT_DIR)
-    __LEGAL_TERMS_DICT_FOLDER = os.path.join(__CURRENT_MODULE_DIR, "legal_forms")
     __NAME_LEGAL_TERMS_DICT_FILE = "us_legal_forms.json"
     __NAME_JSON_ENTRY_LEGAL_TERMS = "legal_forms"
 
@@ -118,7 +102,7 @@ class CompanyNameCleaner:
             No parameters are needed.
 
         Returns:
-            CountryCleaner (object)
+            CompanyNameCleaner (object)
         """
         # The dictionary of cleaning rules define which regex functions to apply to the data
         # A default set of regex rules is defined, but it can be changed by the user.
@@ -129,11 +113,13 @@ class CompanyNameCleaner:
             True  # indicates if legal terms need to be normalized
         )
         # The dictionary of legal terms define how to normalize the text's legal form abreviations
-        self._dict_legal_terms = load_json_file(
-            os.path.join(
-                self.__LEGAL_TERMS_DICT_FOLDER, self.__NAME_LEGAL_TERMS_DICT_FILE
-            )
-        )[self.__NAME_JSON_ENTRY_LEGAL_TERMS]["en"]
+        json_source = files("ferc1_eia_match.package_data").joinpath(
+            self.__NAME_LEGAL_TERMS_DICT_FILE
+        )
+        with as_file(json_source) as json_file_path:
+            self._dict_legal_terms = self._load_json_file(json_file_path)[
+                self.__NAME_JSON_ENTRY_LEGAL_TERMS
+            ]["en"]
 
         # Define the letter case of the cleaning output
         self._output_lettercase = "lower"
@@ -149,6 +135,19 @@ class CompanyNameCleaner:
 
         # Define if the letters with accents are replaced with non-accented ones
         self._remove_accents = False
+
+    def _load_json_file(self, file_to_read: Path) -> Any:
+        """Reads a json file and returns its content as a python dictionary.
+
+        Args:
+            file_to_read (str): complete path and name of the json file to read.
+
+        Returns:
+            (dict): the content of the json file as a python dictionary.
+        """
+        with open(file_to_read, encoding="utf-8") as json_file:
+            dict_content = json.load(json_file)
+        return dict_content
 
     def _apply_regex_rules(
         self, str_value: str, dict_regex_rules: dict[str, list[str]]
