@@ -3,7 +3,7 @@ import logging
 
 import pandas as pd
 
-from ferc_eia_match.name_cleaner import CompanyNameCleaner
+from ferc1_eia_match.name_cleaner import CompanyNameCleaner
 
 logger = logging.getLogger(__name__)
 

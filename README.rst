@@ -40,7 +40,7 @@ based on the ``environment.yml`` file that is stored in the repo:
 
 .. code:: bash
 
-   conda env create --name ferc_eia_match --file environment.yml
+   conda env create --name ferc1_eia_match --file environment.yml
 
 To run the pre-commit hooks before you commit code run:
 

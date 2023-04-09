@@ -26,7 +26,7 @@ jobs:
           channels: conda-forge,defaults
           channel-priority: true
           python-version: "3.11"
-          activate-environment: ferc_eia_match
+          activate-environment: ferc1_eia_match
           environment-file: environment.yml
       - shell: bash -l {0}
         run: |
@@ -51,12 +51,12 @@ jobs:
 
       - name: Log SQLite3 version
         run: |
-          conda run -n ferc_eia_match which sqlite3
-          conda run -n ferc_eia_match sqlite3 --version
+          conda run -n ferc1_eia_match which sqlite3
+          conda run -n ferc1_eia_match sqlite3 --version
 
       - name: Run PyTest with Tox
         run: |
-          conda run -n ferc_eia_match tox
+          conda run -n ferc1_eia_match tox
 
       - name: Upload test coverage report to CodeCov
         uses: codecov/codecov-action@v3.1.1

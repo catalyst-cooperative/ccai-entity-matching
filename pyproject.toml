@@ -7,7 +7,7 @@ requires = [
 ]
 
 [project]
-name = "catalystcoop.ferc_eia_match"
+name = "catalystcoop.ferc1_eia_match"
 description = "Entity matching between FERC Form 1 and EIA 860 data."
 readme = {file = "README.rst", content-type = "text/x-rst"}
 authors = [
@@ -36,9 +36,9 @@ classifiers = [
 keywords = []
 
 [project.urls]
-"Source" = "https://github.com/catalyst-cooperative/ferc_eia_match"
-"Documentation" = "https://catalystcoop-ferc_eia_match.readthedocs.io"
-"Issue Tracker" = "https://github.com/catalyst-cooperative/ferc_eia_match/issues"
+"Source" = "https://github.com/catalyst-cooperative/ferc1_eia_match"
+"Documentation" = "https://catalystcoop-ferc1_eia_match.readthedocs.io"
+"Issue Tracker" = "https://github.com/catalyst-cooperative/ferc1_eia_match/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -97,4 +97,4 @@ include = "\\.pyi?$"
 
 [tool.isort]
 profile = "black"
-known_first_party = ["ferc_eia_match", "pudl", "pudl_catalog"]
+known_first_party = ["ferc1_eia_match", "pudl", "pudl_catalog"]

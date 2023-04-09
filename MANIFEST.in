@@ -1,4 +1,4 @@
-# graft src/ferc_eia_match/package_data
+# graft src/ferc1_eia_match/package_data
 
 prune .github
 prune docs

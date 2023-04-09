@@ -1,4 +1,4 @@
-name: ferc_eia_match
+name: ferc1_eia_match
 channels:
   - conda-forge
   - defaults

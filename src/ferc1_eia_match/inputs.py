@@ -1,13 +1,14 @@
 """Prepare the FERC and EIA input data for matching according to the needs of the specified entity resolution method."""
 
 import logging
-from typing import List, Literal
+from typing import Literal
 
 import pandas as pd
+import sqlalchemy as sa
 
 import pudl
-from ferc_eia_match.helpers import drop_null_cols
-from ferc_eia_match.name_cleaner import CompanyNameCleaner
+from ferc1_eia_match.helpers import drop_null_cols
+from ferc1_eia_match.name_cleaner import CompanyNameCleaner
 
 logger = logging.getLogger(__name__)
 
@@ -49,38 +50,45 @@ class InputManager:
 
     def __init__(
         self,
-        pudl_out: pudl.output.pudltabl.PudlTabl,
+        pudl_engine: sa.engine.Engine,
         linking_tool: Literal["panda", "splink"] = "panda",
-        report_years: List[int] | None = None,
+        start_report_year: int | None = None,
+        end_report_year: int | None = None,
         eia_plant_part: str | None = None,
     ) -> None:
         """Initialize class that gets FERC 1 input for matching with EIA.
 
         Args:
-            pudl_out: PUDL output object to retrieve FERC 1 data.
+            pudl_engine: A connection to the PUDL DB.
             linking_tool: The tool that will be used for matching. The idea is
                 to use this parameter for specific tool dependent filtering/cleaning
                 that needs to happen. Maybe it won't be needed.
-            report_years: A list of the report years to filter the data to. Year values
-                should be integers. None by default, and all years of data will be included.
+            start_report_year: The first year of the report years that the data is filtered by.
+                Year value should be an integer. None by default, and all years of data before
+                ``end_report_year`` will be included.
+            end_report_year: The last year of the report years that the data is filtered by.
+                Year value should be an integer. None by default, and all years of data after
+                ``start_report_year`` will be included.
             eia_plant_part: The plant part to filter the EIA data by. None by default,
                 and all plant parts will be included in the EIA data.
         """
-        self.pudl_out = pudl_out
-        self.pudl_out.freq = "AS"
+        start_date = None
+        end_date = None
+        if start_report_year is not None:
+            start_date = str(start_report_year) + "01-01"
+        if end_report_year is not None:
+            end_date = str(end_report_year) + "-12-31"
+        self.pudl_out = pudl.output.pudltabl.PudlTabl(
+            pudl_engine,
+            start_date=start_date,
+            end_date=end_date,
+            freq="AS",
+        )
         # TODO: need linking_tool?
         self.linking_tool = linking_tool
         # company name string cleaner, currently uses default rules
         self.utility_cleaner = CompanyNameCleaner()
-        self.report_years = report_years
         self.plant_parts_eia = None
-        if self.report_years:
-            self.pudl_out.start_date = pd.to_datetime(
-                str(min(self.report_years)) + "-01-01"
-            )
-            self.pudl_out.end_date = pd.to_datetime(
-                str(max(self.report_years)) + "-12-31"
-            )
         if (
             eia_plant_part is not None
             and eia_plant_part not in pudl.analysis.plant_parts_eia.PLANT_PARTS
@@ -150,9 +158,6 @@ class InputManager:
             )
             .set_index("record_id_ferc1")
         )
-        plants_ferc1_df = plants_ferc1_df[
-            plants_ferc1_df.report_year.isin(self.report_years)
-        ]
         # nullify negative capacity and round values
         plants_ferc1_df.loc[plants_ferc1_df.capacity_mw <= 0, "capacity_mw"] = None
         plants_ferc1_df = plants_ferc1_df.round({"capacity_mw": 2})
