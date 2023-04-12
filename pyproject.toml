@@ -37,9 +37,9 @@ classifiers = [
 keywords = []
 
 [project.urls]
-"Source" = "https://github.com/catalyst-cooperative/ferc1_eia_match"
-"Documentation" = "https://catalystcoop-ferc1_eia_match.readthedocs.io"
-"Issue Tracker" = "https://github.com/catalyst-cooperative/ferc1_eia_match/issues"
+"Source" = "https://https://github.com/catalyst-cooperative/ccai-entity-matching"
+"Documentation" = "https://catalystcoop-ccai-entity-matching.readthedocs.io"
+"Issue Tracker" = "https://github.com/catalyst-cooperative/ccai-entity-matching/issues"
 
 [project.optional-dependencies]
 dev = [
