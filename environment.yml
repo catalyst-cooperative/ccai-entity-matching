@@ -1,6 +1,7 @@
 name: ferc1_eia_match
 channels:
   - conda-forge
+  - pytorch
   - defaults
 dependencies:
   # Packages required for setting up the environment
