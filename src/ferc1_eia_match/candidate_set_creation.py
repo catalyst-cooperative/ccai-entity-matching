@@ -4,7 +4,7 @@ import logging
 import faiss
 import numpy as np
 import pandas as pd
-from scipy.sparse import hstack
+from scipy.sparse import hstack, issparse
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import MinMaxScaler
 
@@ -42,10 +42,10 @@ class DataframeEmbedder:
         self.col_embedding_dict = col_embedding_dict
         # TODO: what's actually the best data structure for holding these embedding vectors?
         # fillna until they're the same length columns and just turn this into a dataframe?
-        self.left_embedded_attribute_dict: dict[str, np.array] = {}
-        self.right_embedded_attribute_dict: dict[str, np.array] = {}
+        self.left_embedding_attribute_dict: dict[str, np.array] = {}
+        self.right_embedding_attribute_dict: dict[str, np.array] = {}
         self.left_embedding_matrix: np.array | None = None
-        self.right_embedded_matrix: np.array | None = None
+        self.right_embedding_matrix: np.array | None = None
         self.blocking_col: str = ""
         self.left_blocks_dict: dict[str, list] = {}
         self.right_blocks_dict: dict[str, list] = {}
@@ -72,10 +72,10 @@ class DataframeEmbedder:
             )
         vectorizer = TfidfVectorizer()
         vectorizer.fit(pd.concat([left_series, right_series]))
-        self.left_embedded_attribute_dict[column_name] = vectorizer.transform(
+        self.left_embedding_attribute_dict[column_name] = vectorizer.transform(
             left_series
         )
-        self.right_embedded_attribute_dict[column_name] = vectorizer.transform(
+        self.right_embedding_attribute_dict[column_name] = vectorizer.transform(
             right_series
         )
 
@@ -109,8 +109,8 @@ class DataframeEmbedder:
         right_array = right_series.fillna(med).to_numpy().reshape(-1, 1)
         scaler = MinMaxScaler()
         scaler.fit(full_array)
-        self.left_embedded_attribute_dict[column_name] = scaler.transform(left_array)
-        self.right_embedded_attribute_dict[column_name] = scaler.transform(right_array)
+        self.left_embedding_attribute_dict[column_name] = scaler.transform(left_array)
+        self.right_embedding_attribute_dict[column_name] = scaler.transform(right_array)
 
     def equal_weight_aggregate(self, embedded_attribute_dict: dict):
         """Equally weight and combine attribute embedding vectors into tuple embeddings."""
@@ -163,52 +163,90 @@ class DataframeEmbedder:
                 self.min_max_scale(column_name=column_name)
         # TODO: allow for other types of aggregation
         self.left_embedding_matrix = self.equal_weight_aggregate(
-            self.left_embedded_attribute_dict
+            self.left_embedding_attribute_dict
         )
         self.right_embedding_matrix = self.equal_weight_aggregate(
-            self.right_embedded_attribute_dict
+            self.right_embedding_attribute_dict
         )
         if blocking_col != "":
             self.set_col_blocks(blocking_col=blocking_col)
 
 
 class SimilaritySearcher:
-    """Conduct a similarity search to select a candidate set of likely matched tuples.
+    """Conduct a search to select a candidate set of likely matched tuples.
+
+    Some methods perform an exact search over all vectors in the index while
+    other searches perform an approximate nearest neighbors search, sacrificing
+    some precision for increased speed.
 
     FAISS indexes: https://github.com/facebookresearch/faiss/wiki/Faiss-indexes
     """
 
-    # TODO implement with cosine similarity as well
+    def __init__(
+        self, query_embedding_matrix: np.array, index_embedding_matrix: np.array
+    ) -> None:
+        """Initialize a similarity search object to create a candidate set of tuple pairs.
 
-    def l2_search(
-        self,
-        query_embeddings,
-        match_embeddings,
-        k: int = 5,
-    ):
-        """Conduct an exact search for L2 distance between vectors.
-
-        The query and match embedding matrices must be sparse.
+        If a spare matrix is passed, it will be made dense.
 
         Arguments:
-            query_embeddings: The embedding matrix representing the query vectors, or
-                vectors for which to search for the k most likely matches i.e. "find the
-                top k closest match vectors for each query vector"
-            match_embeddings: The embedding matrix representing the potential match vectors
-                for the query vectors. An index will be created from these match embeddings
-                which will be searched over to find vectors closest to the query vectors.
+            query_embedding_matrix: The embedding matrix representing the query vectors, or
+                vectors for which to search for the k most similar matches from the
+                ``index_embedding_matrix`` i.e. "for each query vector, find the top k most
+                similar vectors from the index of potential matches".
+            index_embedding_matrix: The embedding matrix representing the potential match vectors
+                for the query vectors. An index will be created from these embeddings
+                which will be searched over to find vectors most similar or closest to the
+                query vectors.
+        """
+        if issparse(query_embedding_matrix):
+            query_embedding_matrix = query_embedding_matrix.todense()
+        if issparse(index_embedding_matrix):
+            index_embedding_matrix = index_embedding_matrix.todense()
+        self.query_embedding_matrix: np.array = query_embedding_matrix
+        self.index_embedding_matrix: np.array = index_embedding_matrix
+
+    def l2_distance_search(
+        self,
+        k: int = 5,
+    ) -> np.array:
+        """Conduct an exact search for smallest L2 distance between vectors.
+
+        Arguments:
             k: The number of potential record matches to find for each query vector.
 
         Returns:
             Numpy array of shape ``(len(query_embeddings), k)`` where each row represents
-            the k indices of the match embeddings matrix that are closest to each query
+            the k indices of the index embeddings matrix that are closest to each query
+            vector.
+        """
+        index_d = self.index_embedding_matrix.shape[1]
+        index = faiss.IndexFlatL2(index_d)
+        index.add(self.index_embedding_matrix)
+        distances, match_indices = index.search(self.query_embedding_matrix, k)
+
+        return match_indices
+
+    def cosine_similarity_search(
+        self,
+        k: int = 5,
+    ):
+        """Conduct an exact search for highest cosine similarity between vectors.
+
+        Arguments:
+            k: The number of potential record matches to find for each query vector.
+
+        Returns:
+            Numpy array of shape ``(len(query_embeddings), k)`` where each row represents
+            the k indices of the index embeddings matrix that are most similar to each query
             vector.
         """
         # TODO: normalize the embedding matrices
-        index_d = match_embeddings.shape[1]
-        index = faiss.IndexFlatL2(index_d)
-        # faiss.normalize_L2(match_embeddings)
-        index.add(match_embeddings.todense())
-        distances, match_indices = index.search(query_embeddings.todense(), k)
+        index_d = self.index_embedding_matrix.shape[1]
+        # use the Inner Product Index, which is equivalent to cosine sim for normalized vectors
+        index = faiss.IndexFlatIP(index_d)
+        faiss.normalize_L2(self.index_embedding_matrix)
+        index.add(self.index_embedding_matrix)
+        distances, match_indices = index.search(self.query_embedding_matrix, k)
 
         return match_indices
