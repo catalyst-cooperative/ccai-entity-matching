@@ -203,8 +203,8 @@ class SimilaritySearcher:
             query_embedding_matrix = query_embedding_matrix.todense()
         if issparse(index_embedding_matrix):
             index_embedding_matrix = index_embedding_matrix.todense()
-        self.query_embedding_matrix: np.array = query_embedding_matrix
-        self.index_embedding_matrix: np.array = index_embedding_matrix
+        self.query_embedding_matrix: np.array = np.float32(query_embedding_matrix)
+        self.index_embedding_matrix: np.array = np.float32(index_embedding_matrix)
 
     def l2_distance_search(
         self,
@@ -246,6 +246,7 @@ class SimilaritySearcher:
         # use the Inner Product Index, which is equivalent to cosine sim for normalized vectors
         index = faiss.IndexFlatIP(index_d)
         faiss.normalize_L2(self.index_embedding_matrix)
+        faiss.normalize_L2(self.query_embedding_matrix)
         index.add(self.index_embedding_matrix)
         distances, match_indices = index.search(self.query_embedding_matrix, k)
 
