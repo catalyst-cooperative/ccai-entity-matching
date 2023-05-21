@@ -42,10 +42,10 @@ class DataframeEmbedder:
         self.col_embedding_dict = col_embedding_dict
         # TODO: what's actually the best data structure for holding these embedding vectors?
         # fillna until they're the same length columns and just turn this into a dataframe?
-        self.left_embedding_attribute_dict: dict[str, np.array] = {}
-        self.right_embedding_attribute_dict: dict[str, np.array] = {}
-        self.left_embedding_matrix: np.array | None = None
-        self.right_embedding_matrix: np.array | None = None
+        self.left_embedding_attribute_dict: dict[str, np.ndarray] = {}
+        self.right_embedding_attribute_dict: dict[str, np.ndarray] = {}
+        self.left_embedding_matrix: np.ndarray | None = None
+        self.right_embedding_matrix: np.ndarray | None = None
         self.blocking_col: str = ""
         self.left_blocks_dict: dict[str, list] = {}
         self.right_blocks_dict: dict[str, list] = {}
@@ -183,8 +183,10 @@ class SimilaritySearcher:
     """
 
     def __init__(
-        self, query_embedding_matrix: np.array, index_embedding_matrix: np.array
-    ) -> None:
+        self,
+        query_embedding_matrix,
+        index_embedding_matrix,
+    ):
         """Initialize a similarity search object to create a candidate set of tuple pairs.
 
         If a spare matrix is passed, it will be made dense.
@@ -203,13 +205,13 @@ class SimilaritySearcher:
             query_embedding_matrix = query_embedding_matrix.todense()
         if issparse(index_embedding_matrix):
             index_embedding_matrix = index_embedding_matrix.todense()
-        self.query_embedding_matrix: np.array = np.float32(query_embedding_matrix)
-        self.index_embedding_matrix: np.array = np.float32(index_embedding_matrix)
+        self.query_embedding_matrix = np.float32(query_embedding_matrix)
+        self.index_embedding_matrix = np.float32(index_embedding_matrix)
 
     def l2_distance_search(
         self,
-        k: int = 5,
-    ) -> np.array:
+        k=5,
+    ):
         """Conduct an exact search for smallest L2 distance between vectors.
 
         Arguments:
