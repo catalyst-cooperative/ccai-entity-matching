@@ -182,11 +182,7 @@ class SimilaritySearcher:
     FAISS indexes: https://github.com/facebookresearch/faiss/wiki/Faiss-indexes
     """
 
-    def __init__(
-        self,
-        query_embedding_matrix,
-        index_embedding_matrix,
-    ):
+    def __init__(self, query_embedding_matrix, menu_embedding_matrix, base_index=None):
         """Initialize a similarity search object to create a candidate set of tuple pairs.
 
         If a spare matrix is passed, it will be made dense.
@@ -194,45 +190,49 @@ class SimilaritySearcher:
         Arguments:
             query_embedding_matrix: The embedding matrix representing the query vectors, or
                 vectors for which to search for the k most similar matches from the
-                ``index_embedding_matrix`` i.e. "for each query vector, find the top k most
+                ``menu_embedding_matrix`` i.e. "for each query vector, find the top k most
                 similar vectors from the index of potential matches".
-            index_embedding_matrix: The embedding matrix representing the potential match vectors
-                for the query vectors. An index will be created from these embeddings
-                which will be searched over to find vectors most similar or closest to the
-                query vectors.
+            menu_embedding_matrix: The embedding matrix representing the potential match vectors
+                for the query vectors. These vector embeddings which will be searched over to find
+                vectors most similar or closest to the query vectors.
+            base_index (list): The base index for ``menu_embedding_matrix`` that will be
+                searched over for matches. Used to map back to the original vectors if the
+                embeddings were transformed in some way. Default is None and the search
+                will return the position of the vectors in the embedding matrix.
         """
         if issparse(query_embedding_matrix):
             query_embedding_matrix = query_embedding_matrix.todense()
-        if issparse(index_embedding_matrix):
-            index_embedding_matrix = index_embedding_matrix.todense()
+        if issparse(menu_embedding_matrix):
+            menu_embedding_matrix = menu_embedding_matrix.todense()
         self.query_embedding_matrix = np.float32(query_embedding_matrix)
-        self.index_embedding_matrix = np.float32(index_embedding_matrix)
+        self.menu_embedding_matrix = np.float32(menu_embedding_matrix)
+        self.base_index = base_index
 
-    def l2_distance_search(
-        self,
-        k=5,
-    ):
+    def l2_distance_search(self, k=5):
         """Conduct an exact search for smallest L2 distance between vectors.
 
         Arguments:
-            k: The number of potential record matches to find for each query vector.
+            k (int): The number of potential record matches to find for each query vector.
 
         Returns:
             Numpy array of shape ``(len(query_embeddings), k)`` where each row represents
             the k indices of the index embeddings matrix that are closest to each query
-            vector.
+            vector. If ``base_index`` is not None, then this will be the index of the vector
+            in the base index.
         """
-        index_d = self.index_embedding_matrix.shape[1]
-        index = faiss.IndexFlatL2(index_d)
-        index.add(self.index_embedding_matrix)
+        dim = self.menu_embedding_matrix.shape[1]
+        if self.base_index is not None:
+            index_l2 = faiss.IndexFlatL2(dim)
+            index = faiss.IndexIDMap(index_l2)
+            index.add_with_ids(self.menu_embedding_matrix, self.base_index)
+        else:
+            index = faiss.IndexFlatL2(dim)
+            index.add(self.menu_embedding_matrix)
         distances, match_indices = index.search(self.query_embedding_matrix, k)
 
         return match_indices
 
-    def cosine_similarity_search(
-        self,
-        k: int = 5,
-    ):
+    def cosine_similarity_search(self, k: int = 5):
         """Conduct an exact search for highest cosine similarity between vectors.
 
         Arguments:
@@ -240,16 +240,21 @@ class SimilaritySearcher:
 
         Returns:
             Numpy array of shape ``(len(query_embeddings), k)`` where each row represents
-            the k indices of the index embeddings matrix that are most similar to each query
-            vector.
+            the k indices of the index embeddings matrix that are closest to each query
+            vector. If ``base_index`` is not None, then this will be the index of the vector
+            in the base index.
         """
-        # TODO: normalize the embedding matrices
-        index_d = self.index_embedding_matrix.shape[1]
-        # use the Inner Product Index, which is equivalent to cosine sim for normalized vectors
-        index = faiss.IndexFlatIP(index_d)
-        faiss.normalize_L2(self.index_embedding_matrix)
+        dim = self.menu_embedding_matrix.shape[1]
+        faiss.normalize_L2(self.menu_embedding_matrix)
         faiss.normalize_L2(self.query_embedding_matrix)
-        index.add(self.index_embedding_matrix)
+        # use the Inner Product Index, which is equivalent to cosine sim for normalized vectors
+        if self.base_index is not None:
+            index_ip = faiss.IndexFlatIP(dim)
+            index = faiss.IndexIDMap(index_ip)
+            index.add_with_ids(self.menu_embedding_matrix, self.base_index)
+        else:
+            index = faiss.IndexFlatIP(dim)
+            index.add(self.menu_embedding_matrix)
         distances, match_indices = index.search(self.query_embedding_matrix, k)
 
         return match_indices
