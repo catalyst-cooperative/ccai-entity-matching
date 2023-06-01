@@ -4,6 +4,7 @@ import logging
 import faiss
 import numpy as np
 import pandas as pd
+import sqlalchemy as sa
 from scipy.sparse import hstack, issparse
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import MinMaxScaler
@@ -19,6 +20,7 @@ class DataframeEmbedder:
         left_df: pd.DataFrame,
         col_embedding_dict: dict[str, str],
         right_df: pd.DataFrame = pd.DataFrame(),
+        pudl_engine: sa.engine.Engine | None = None,
     ):
         """Initialize a dataframe embedder object to vectorize one or two dataframe.
 
@@ -36,10 +38,14 @@ class DataframeEmbedder:
             right_df: The right dataframe to be embedded. If it's an empty dataframe, then
                 only ``left_df`` will be embedded. The index should be the default, numeric
                 index.
+            pudl_engine: A connection to the PUDL DB. Used for getting valid Fuel Type Code PUDL
+                values for possible imputation of nulls. If None, no values will be imputed
+                in ``self.fill_fuel_type_from_name``.
         """
-        self.left_df = left_df
-        self.right_df = right_df
+        self.left_df = left_df.copy()
+        self.right_df = right_df.copy()
         self.col_embedding_dict = col_embedding_dict
+        self.pudl_engine = pudl_engine
         # TODO: what's actually the best data structure for holding these embedding vectors?
         # fillna until they're the same length columns and just turn this into a dataframe?
         self.left_embedding_attribute_dict: dict[str, np.ndarray] = {}
@@ -57,7 +63,11 @@ class DataframeEmbedder:
         # fill nulls with the empty string so they become 0 vectors
         logger.info(f"Converting {column_name} to TF-IDF features.")
         if column_name in self.left_df.columns:
-            left_series = self.left_df[column_name].fillna("")
+            # TODO: take out this conditional with dict
+            left_series = self.left_df[column_name]
+            if column_name == "fuel_type_code_pudl":
+                left_series = self.fill_fuel_type_from_name(self.left_df)
+            left_series = left_series.fillna("")
         else:
             raise AssertionError(
                 f"{column_name} is not in left dataframe columns. Can't vectorize."
@@ -65,7 +75,10 @@ class DataframeEmbedder:
         if self.right_df.empty:
             right_series = pd.Series()
         elif column_name in self.right_df.columns:
-            right_series = self.right_df[column_name].fillna("")
+            right_series = self.right_df[column_name]
+            if column_name == "fuel_type_code_pudl":
+                right_series = self.fill_fuel_type_from_name(self.right_df)
+            right_series = right_series.fillna("")
         else:
             raise AssertionError(
                 f"{column_name} is not in right dataframe columns. Can't vectorize."
@@ -85,6 +98,12 @@ class DataframeEmbedder:
         logger.info(f"Scaling {column_name} with MinMaxScaler.")
         if column_name in self.left_df.columns:
             left_series = self.left_df[column_name]
+            if (column_name == "installation_year") or (
+                column_name == "construction_year"
+            ):
+                left_series = self.match_installation_construction_year(self.left_df)[
+                    column_name
+                ]
         else:
             raise AssertionError(
                 f"{column_name} is not in left dataframe columns. Can't vectorize."
@@ -93,6 +112,12 @@ class DataframeEmbedder:
             right_series = pd.Series()
         elif column_name in self.right_df.columns:
             right_series = self.right_df[column_name]
+            if (column_name == "installation_year") or (
+                column_name == "construction_year"
+            ):
+                right_series = self.match_installation_construction_year(self.right_df)[
+                    column_name
+                ]
         else:
             raise AssertionError(
                 f"{column_name} is not in right dataframe columns. Can't vectorize."
@@ -111,6 +136,65 @@ class DataframeEmbedder:
         scaler.fit(full_array)
         self.left_embedding_attribute_dict[column_name] = scaler.transform(left_array)
         self.right_embedding_attribute_dict[column_name] = scaler.transform(right_array)
+
+    def match_installation_construction_year(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Function to impute missing installation or construction yaers.
+
+        It's likely better to fill an installation/construction year to be equal instead
+        of imputing with an average. If one of installation year or construction year is null,
+        fill with the other.
+        """
+        df.fillna(
+            {
+                "installaton_year": df["construction_year"],
+                "construction_year": df["installation_year"],
+            },
+            inplace=True,
+        )
+        return df
+
+    def _extract_keyword_from_column(
+        self, ser: pd.Series, keyword_list: list[str]
+    ) -> pd.Series:
+        """Extract keywords contained in a Pandas series with a regular expression."""
+        pattern = r"(?:^|\s+)(" + "|".join(keyword_list) + r")(?:\s+|$)"
+        return ser.str.extract(pattern, expand=False)
+
+    def fill_fuel_type_from_name(self, df: pd.DataFrame) -> pd.Series:
+        """Impute missing fuel_type_code_pudl data from plant name.
+
+        If a missing fuel type code is contained in the plant name, fill in the fuel
+        type code PUDL for that record. E.g. "Washington Hydro"
+        """
+        if self.pudl_engine is None:
+            logger.info(
+                "No connnection to the PUDL DB was given to the DataframeEmbedder. "
+                "No Fuel Type Code PUDL values will be imputed from the plant name."
+            )
+            return
+        with self.pudl_engine.connect() as conn:
+            ftcp = conn.execute(
+                "SELECT DISTINCT fuel_type_code_pudl FROM energy_sources_eia"
+            )
+            fuel_type_list = [fuel[0] for fuel in ftcp]
+        fuel_type_map = {fuel_type: fuel_type for fuel_type in fuel_type_list}
+        fuel_type_map.update(
+            {
+                "pumped storage": "hydro",
+                "peaker": "gas",
+                "gt": "gas",
+                "peaking": "gas",
+                "river": "hydro",
+                "falls": "hydro",
+            }
+        )
+        # grab fuel type keywords that are within plant_name and fill in null FTCP
+        df["fuel_type_code_pudl"] = df["fuel_type_code_pudl"].fillna(
+            self._extract_keyword_from_column(
+                df["plant_name"], list(fuel_type_map.keys())
+            ).map(fuel_type_map)
+        )
+        return df["fuel_type_code_pudl"]
 
     def equal_weight_aggregate(self, embedded_attribute_dict: dict):
         """Equally weight and combine attribute embedding vectors into tuple embeddings."""
