@@ -27,3 +27,8 @@ dependencies:
   # Use pip to install the package defined by this repo for development:
   - pip:
       - --editable ./[dev,docs,tests,types]
+
+variables:
+  # fixes faiss search slowdown error
+  OMP_WAIT_POLICY: "PASSIVE"
+  OMP_NUM_THREADS: 1

@@ -160,6 +160,7 @@ class DataframeEmbedder:
         pattern = r"(?:^|\s+)(" + "|".join(keyword_list) + r")(?:\s+|$)"
         return ser.str.extract(pattern, expand=False)
 
+    # TODO: move this to preprocessing
     def fill_fuel_type_from_name(self, df: pd.DataFrame) -> pd.Series:
         """Impute missing fuel_type_code_pudl data from plant name.
 
