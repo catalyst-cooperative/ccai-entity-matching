@@ -1,48 +1,14 @@
 """Prepare the FERC and EIA input data for matching according to the needs of the specified entity resolution method."""
 
 import logging
-from typing import Literal
 
 import pandas as pd
 import sqlalchemy as sa
 
 import pudl
-from ferc1_eia_match.helpers import drop_null_cols
 from ferc1_eia_match.name_cleaner import CompanyNameCleaner
 
 logger = logging.getLogger(__name__)
-
-
-def splink_preprocess(df: pd.DataFrame) -> pd.DataFrame:
-    """Prepare EIA and FERC data for matching with splink.
-
-    Dataframe should have ``record_id_eia`` or ``record_id_ferc1`` as the index.
-    """
-    df = drop_null_cols(df, threshold=0.8)
-    # need to make the record id index a column for splink to have a unique id col
-    df["record_id"] = df.index
-    # keep all cols for now
-    """
-    splink_cols = [
-        "report_year",
-        "plant_name",
-        "utility_name",
-        "installation_year",
-        "construction_year",
-        "capacity_mw",
-        "fuel_type_code_pudl",
-        "utility_id_pudl",
-        "plant_id_pudl",
-    ]
-    df = df[splink_cols]
-    """
-    return df
-
-
-# the preprocessing function to use for the EIA and FERC datasets for each linking tool
-LINKER_PREPROCESS_FUNCS = {
-    "splink": {"eia": splink_preprocess, "ferc": splink_preprocess}
-}
 
 
 class InputManager:
@@ -51,7 +17,6 @@ class InputManager:
     def __init__(
         self,
         pudl_engine: sa.engine.Engine,
-        linking_tool: Literal["panda", "splink"] = "panda",
         start_report_year: int | None = None,
         end_report_year: int | None = None,
         eia_plant_part: str | None = None,
@@ -60,9 +25,6 @@ class InputManager:
 
         Args:
             pudl_engine: A connection to the PUDL DB.
-            linking_tool: The tool that will be used for matching. The idea is
-                to use this parameter for specific tool dependent filtering/cleaning
-                that needs to happen. Maybe it won't be needed.
             start_report_year: The first year of the report years that the data is filtered by.
                 Year value should be an integer. None by default, and all years of data before
                 ``end_report_year`` will be included.
@@ -72,6 +34,7 @@ class InputManager:
             eia_plant_part: The plant part to filter the EIA data by. None by default,
                 and all plant parts will be included in the EIA data.
         """
+        self.pudl_engine = pudl_engine
         start_date = None
         end_date = None
         if start_report_year is not None:
@@ -84,11 +47,27 @@ class InputManager:
             end_date=end_date,
             freq="AS",
         )
-        # TODO: need linking_tool?
-        self.linking_tool = linking_tool
-        # company name string cleaner, currently uses default rules
-        self.utility_cleaner = CompanyNameCleaner()
-        self.plant_parts_eia = None
+        # use default rules for utility_name
+        self.utility_name_cleaner = CompanyNameCleaner()
+        # default rules except keep words in parentheses
+        self.plant_name_cleaner = CompanyNameCleaner(
+            cleaning_rules_list=[
+                "replace_amperstand_between_space_by_AND",
+                "replace_hyphen_between_spaces_by_single_space",
+                "replace_underscore_by_space",
+                "replace_underscore_between_spaces_by_single_space",
+                "remove_text_puctuation_except_dot",
+                "remove_math_symbols",
+                "add_space_before_opening_parentheses",
+                "add_space_after_closing_parentheses",
+                "remove_parentheses",
+                "remove_brackets",
+                "remove_curly_brackets",
+                "enforce_single_space_between_words",
+            ]
+        )
+        self.eia_df = None
+        self.ferc1_df = None
         if (
             eia_plant_part is not None
             and eia_plant_part not in pudl.analysis.plant_parts_eia.PLANT_PARTS
@@ -96,6 +75,61 @@ class InputManager:
             raise AssertionError(f"{eia_plant_part} is not a valid EIA plant part.")
         else:
             self.eia_plant_part = eia_plant_part
+
+    def _extract_keyword_from_column(
+        self, ser: pd.Series, keyword_list: list[str]
+    ) -> pd.Series:
+        """Extract keywords contained in a Pandas series with a regular expression."""
+        pattern = r"(?:^|\s+)(" + "|".join(keyword_list) + r")(?:\s+|$)"
+        return ser.str.extract(pattern, expand=False)
+
+    def fill_fuel_type_from_name(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Impute missing fuel_type_code_pudl data from plant name.
+
+        If a missing fuel type code is contained in the plant name, fill in the fuel
+        type code PUDL for that record. E.g. "Washington Hydro"
+        """
+        if "fuel_type_code_pudl" not in df.columns:
+            raise AssertionError("fuel_type_code_pudl is not in dataframe columns.")
+        with self.pudl_engine.connect() as conn:
+            ftcp = conn.execute(
+                "SELECT DISTINCT fuel_type_code_pudl FROM energy_sources_eia"
+            )
+            fuel_type_list = [fuel[0] for fuel in ftcp]
+        fuel_type_map = {fuel_type: fuel_type for fuel_type in fuel_type_list}
+        fuel_type_map.update(
+            {
+                "pumped storage": "hydro",
+                "peaker": "gas",
+                "gt": "gas",
+                "peaking": "gas",
+                "river": "hydro",
+                "falls": "hydro",
+            }
+        )
+        # grab fuel type keywords that are within plant_name and fill in null FTCP
+        df["fuel_type_code_pudl"] = df["fuel_type_code_pudl"].fillna(
+            self._extract_keyword_from_column(
+                df["plant_name"], list(fuel_type_map.keys())
+            ).map(fuel_type_map)
+        )
+        return df
+
+    def match_installation_construction_year(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Function to impute missing installation or construction yaers.
+
+        It's likely better to fill an installation/construction year to be equal instead
+        of imputing with an average. If one of installation year or construction year is null,
+        fill with the other.
+        """
+        df.fillna(
+            {
+                "installaton_year": df["construction_year"],
+                "construction_year": df["installation_year"],
+            },
+            inplace=True,
+        )
+        return df
 
     def get_ferc_input(self) -> pd.DataFrame:
         """Get the FERC 1 plants data from PUDL and prepare for matching.
@@ -143,12 +177,11 @@ class InputManager:
                     "fuel_mmbtu": "total_mmbtu",
                     "opex_fuel_per_mwh": "fuel_cost_per_mwh",
                     "primary_fuel_by_mmbtu": "fuel_type_code_pudl",
-                    "plant_name_ferc1": "plant_name",  # rename so column names match EIA side
                 }
             )
             .astype(
                 {
-                    "plant_name": "string",
+                    "plant_name_ferc1": "string",
                     "utility_name_ferc1": "string",
                     "fuel_type_code_pudl": "string",
                     "installation_year": "Int64",
@@ -162,21 +195,24 @@ class InputManager:
         plants_ferc1_df.loc[plants_ferc1_df.capacity_mw <= 0, "capacity_mw"] = None
         plants_ferc1_df = plants_ferc1_df.round({"capacity_mw": 2})
         # basic string cleaning
-        str_cols = ["utility_name_ferc1", "plant_name"]
+        str_cols = ["utility_name_ferc1", "plant_name_ferc1"]
         plants_ferc1_df[str_cols] = plants_ferc1_df[str_cols].apply(
             lambda x: x.str.strip().str.lower()
         )
-        plants_ferc1_df = self.utility_cleaner.get_clean_df(
-            plants_ferc1_df, "utility_name_ferc1", "utility_name"
+        plants_ferc1_df = (
+            plants_ferc1_df.pipe(
+                self.utility_name_cleaner.get_clean_df,
+                "utility_name_ferc1",
+                "utility_name",
+            )
+            .pipe(
+                self.plant_name_cleaner.get_clean_df, "plant_name_ferc1", "plant_name"
+            )
+            .pipe(self.fill_fuel_type_from_name)
+            .pipe(self.match_installation_construction_year)
         )
 
-        # apply tool specific preprocessing
-        if self.linking_tool in LINKER_PREPROCESS_FUNCS:
-            logger.info(f"Applying preprocess function for {self.linking_tool}.")
-            plants_ferc1_df = LINKER_PREPROCESS_FUNCS[self.linking_tool]["ferc"](
-                plants_ferc1_df
-            )
-
+        self.ferc1_df = plants_ferc1_df
         return plants_ferc1_df
 
     def get_eia_input(self, update: bool = False) -> pd.DataFrame:
@@ -222,11 +258,9 @@ class InputManager:
             [non_null_df, plant_parts_eia[plant_parts_eia.utility_id_eia.isnull()]]
         ).reindex(plant_parts_eia.index)
         # utility_name_eia will be renamed in company name cleaning step
-        plant_parts_eia = plant_parts_eia.rename(
-            columns={"plant_name_eia": "plant_name"}
-        ).astype(
+        plant_parts_eia = plant_parts_eia.astype(
             {
-                "plant_name": "string",
+                "plant_name_eia": "string",
                 "utility_name_eia": "string",
                 "fuel_type_code_pudl": "string",
                 "technology_description": "string",
@@ -239,18 +273,20 @@ class InputManager:
         plant_parts_eia.loc[plant_parts_eia.capacity_mw <= 0, "capacity_mw"] = None
         plant_parts_eia = plant_parts_eia.round({"capacity_mw": 2})
         # basic string cleaning
-        str_cols = ["utility_name_eia", "plant_name"]
+        str_cols = ["utility_name_eia", "plant_name_eia"]
         plant_parts_eia[str_cols] = plant_parts_eia[str_cols].apply(
             lambda x: x.str.strip().str.lower()
         )
-        plant_parts_eia = self.utility_cleaner.get_clean_df(
-            plant_parts_eia, "utility_name_eia", "utility_name"
-        )
-        if self.linking_tool in LINKER_PREPROCESS_FUNCS:
-            logger.info(f"Applying preprocess function for {self.linking_tool}.")
-            plant_parts_eia = LINKER_PREPROCESS_FUNCS[self.linking_tool]["eia"](
-                plant_parts_eia
+        plant_parts_eia = (
+            plant_parts_eia.pipe(
+                self.utility_name_cleaner.get_clean_df,
+                "utility_name_eia",
+                "utility_name",
             )
-        self.plant_parts_eia = plant_parts_eia
+            .pipe(self.plant_name_cleaner.get_clean_df, "plant_name_eia", "plant_name")
+            .pipe(self.fill_fuel_type_from_name)
+            .pipe(self.match_installation_construction_year)
+        )
+        self.eia_df = plant_parts_eia
 
-        return self.plant_parts_eia
+        return plant_parts_eia

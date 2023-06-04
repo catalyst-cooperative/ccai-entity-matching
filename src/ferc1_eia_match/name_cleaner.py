@@ -21,6 +21,8 @@ CLEANING_RULES_DICT = {
     "enforce_single_space_between_words": [" ", r"\s+"],
     "replace_amperstand_by_AND": [" and ", r"&"],
     "add_space_between_amperstand": [" & ", r"&"],
+    "add_space_before_opening_parentheses": [" (", r"\("],
+    "add_space_after_closing_parentheses": [") ", r"\)"],
     "replace_amperstand_between_space_by_AND": [" and ", r"\s+&\s+"],
     "replace_hyphen_by_space": [" ", r"-"],
     "replace_hyphen_between_spaces_by_single_space": [" ", r"\s+-\s+"],
@@ -71,10 +73,10 @@ class CompanyNameCleaner:
     """Class to normalize/clean up text based company names.
 
     Attributes:
-        _dict_cleaning_rules (dict): the dictionary of cleaning rules loaded from a json file. The cleaning rules
+        _cleaning_rules_dict (dict): the dictionary of cleaning rules loaded from a json file. The cleaning rules
                     are written in regex format and can be easily updated or incremented by changing the file.
-        _default_cleaning_rules (list): a list of cleaning rules to be applied. The dictionary of
-                    cleaning rules may contain rules that are not needed. Therefore, the _default_cleaning_rules
+        _cleaning_rules_list (list): a list of cleaning rules to be applied. The dictionary of
+                    cleaning rules may contain rules that are not needed. Therefore, the _cleaning_rules_list
                     allows the user to select only the cleaning rules necessary of interest. This list is also
                     read from a json file and can be easily updated by changing the file or setting up the
                     correspondent class property.
@@ -95,19 +97,27 @@ class CompanyNameCleaner:
     __NAME_LEGAL_TERMS_DICT_FILE = "us_legal_forms.json"
     __NAME_JSON_ENTRY_LEGAL_TERMS = "legal_forms"
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        cleaning_rules_list: list = DEFAULT_COMPANY_CLEANING_RULES,
+        cleaning_rules_definitions_dict: dict = CLEANING_RULES_DICT,
+    ) -> None:
         """Constructor method.
 
-        Parameters:
-            No parameters are needed.
+        Arguments:
+            cleaning_rules_list: A list of the rules to apply for cleaning. By default is
+                DEFAULT_COMPANY_CLEANING_RULES
+            cleaning_rules_definitions_dict: A dictionary of cleaning rules where the keys
+                are the name of the cleaning rule and the value is the rule. By default is
+                CLEANING_RULES_DICT
 
         Returns:
             CompanyNameCleaner (object)
         """
         # The dictionary of cleaning rules define which regex functions to apply to the data
         # A default set of regex rules is defined, but it can be changed by the user.
-        self._dict_cleaning_rules = CLEANING_RULES_DICT
-        self._default_cleaning_rules = DEFAULT_COMPANY_CLEANING_RULES
+        self._cleaning_rules_dict = cleaning_rules_definitions_dict
+        self._cleaning_rules_list = cleaning_rules_list
 
         self._normalize_legal_terms = (
             True  # indicates if legal terms need to be normalized
@@ -212,8 +222,8 @@ class CompanyNameCleaner:
     def _apply_cleaning_rules(self, company_name: str) -> str:
         """Apply the cleaning rules from the dictionary of regex rules."""
         cleaning_dict = {}
-        for rule_name in self._default_cleaning_rules:
-            cleaning_dict[rule_name] = self._dict_cleaning_rules[rule_name]
+        for rule_name in self._cleaning_rules_list:
+            cleaning_dict[rule_name] = self._cleaning_rules_dict[rule_name]
 
         # Apply all the cleaning rules
         clean_company_name = self._apply_regex_rules(company_name, cleaning_dict)
@@ -298,14 +308,14 @@ class CompanyNameCleaner:
     def get_clean_df(
         self,
         df: pd.DataFrame,
-        in_company_name_attribute: str,
-        out_company_name_attribute: str,
+        in_company_name_attribute: str | list,
+        out_company_name_attribute: str | list,
     ) -> pd.DataFrame:
         """Clean up text names in a dataframe.
 
         Arguments:
             df (dataframe): the input dataframe that contains the text's name to be cleaned
-            in_company_name_attribute (str): the attribute in the dataframe that contains then names
+            in_company_name_attribute (str): the attribute in the dataframe that contains the names
             out_company_name_attribute (str): the attribute to be created for the clean version of
                 the text's name
 
