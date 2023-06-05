@@ -273,9 +273,7 @@ class SimilaritySearcher:
         self.menu_blocks_dict = menu_blocks_dict
         self.menu_dim = menu_embedding_matrix.shape[1]
 
-    def l2_distance_search(
-        self, queries_idx: np.ndarray, menu_idx: np.ndarray, k: int
-    ) -> np.ndarray:
+    def l2_distance_search(self, queries_idx: np.ndarray, menu_idx: np.ndarray, k: int):
         """Conduct an exact search for smallest L2 distance between vectors.
 
         Get the k vectors from the menu matrix that minimizes the L2 distance to query
@@ -305,7 +303,7 @@ class SimilaritySearcher:
 
     def cosine_similarity_search(
         self, queries_idx: np.ndarray, menu_idx: np.ndarray, k: int
-    ) -> np.ndarray:
+    ):
         """Conduct an exact search for highest cosine similarity between vectors.
 
         Normalize matrices and take the inner product, equivalent to cosine similarity.
