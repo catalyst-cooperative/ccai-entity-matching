@@ -97,7 +97,7 @@ def _get_plant_name_cleaner() -> CompanyNameCleaner:
 
 
 @asset
-def get_ferc_input(pudl_input_resource: PudlInputs) -> pd.DataFrame:
+def ferc_input(pudl_input_resource: PudlInputs) -> pd.DataFrame:
     """Get the FERC 1 plants data from PUDL and prepare for matching.
 
     Merge FERC 1 fuel usage by plant attributes onto all FERC 1 plant records,
@@ -188,9 +188,7 @@ class EiaInputConfig(Config):
 
 
 @asset
-def get_eia_input(
-    config: EiaInputConfig, pudl_input_resource: PudlInputs
-) -> pd.DataFrame:
+def eia_input(config: EiaInputConfig, pudl_input_resource: PudlInputs) -> pd.DataFrame:
     """Get the distinct EIA plant parts list from PUDL and prepare for matching.
 
     The distinct plant parts list includes only the true granularities of plant part
