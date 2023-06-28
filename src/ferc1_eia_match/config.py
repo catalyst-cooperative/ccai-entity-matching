@@ -24,6 +24,12 @@ class EmbeddingConfig(BaseModel):
     matching_cols: list[str]
     blocking_col: str
 
+    def get_formatted_embedding(self):
+        """Return embedding map as expected by ``DataFrameEmbedder``."""
+        return {
+            name: [value.embedding_type] for name, value in self.embedding_map.items()
+        }
+
 
 class SimilaritySearch(BaseModel):
     """Configuration for similarity search step."""
