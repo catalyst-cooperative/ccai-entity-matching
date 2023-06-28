@@ -5,7 +5,7 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
-import mlflow
+import mlflow  # type: ignore
 import numpy as np
 import pandas as pd
 
