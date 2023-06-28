@@ -1,0 +1,15 @@
+artifact_uri: file:///home/zach/catalyst/ccai-entity-matching/mlruns/0/759b1af8fcaa4ad781fbcddf168cd92c/artifacts
+end_time: 1687964922286
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 759b1af8fcaa4ad781fbcddf168cd92c
+run_name: welcoming-hen-297
+run_uuid: 759b1af8fcaa4ad781fbcddf168cd92c
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1687964766803
+status: 3
+tags: []
+user_id: zach
