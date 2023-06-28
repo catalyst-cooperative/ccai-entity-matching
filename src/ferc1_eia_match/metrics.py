@@ -29,6 +29,7 @@ def measure_blocking(
     """Record important metrics from blocking step using mlflow."""
     mlflow.set_tracking_uri(f"file:{str(mlruns)}")
     mlflow.set_experiment(experiment_name="blocking")
+
     train_df_with_idx = train_df.merge(
         ferc_left.reset_index(names="ferc_index")[["record_id_ferc1", "ferc_index"]],
         how="inner",
