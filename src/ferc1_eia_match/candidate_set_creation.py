@@ -8,6 +8,8 @@ from scipy.sparse import hstack, issparse
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import MinMaxScaler
 
+from ferc1_eia_match.config import ColumnEmbedding
+
 logger = logging.getLogger(__name__)
 
 
@@ -19,24 +21,25 @@ class DataframeEmbedder:
     def __init__(
         self,
         left_df: pd.DataFrame,
-        col_embedding_dict: dict[str, list],
+        embedding_map: dict[str, ColumnEmbedding],
+        # embedding_map: Type[EmbeddingConfig.embedding_map],
         right_df: pd.DataFrame = pd.DataFrame(),
     ):
         """Initialize a dataframe embedder object to vectorize one or two dataframe.
 
         If no ``right_df`` is given, then only ``left_df`` will be embedded. The left and right
         dataframe must share all the columns that are going to be vectorized. Column names of
-        the embedded columns must be keys in ``col_embedding_dict``.
+        the embedded columns must be keys in ``embedding_map``.
 
         Arguments:
             left_df: The left dataframe to be embedded. If no ``right_df`` is given, then this
                 is the only dataframe that will be embedded. The index should be the default,
                 numeric index.
-            col_embedding_dict: A dictionary specifying the functions for embedding each column
+            embedding_map: A dictionary specifying the functions for embedding each column
                 in the dataframe or dataframes and the keyword arguments for the function.
-                All columns that are to be vectorized must be keys in the dictionary. Values are a list
-                with the function name that will be used to vectorize that column and a dictionary with
-                keyword arguments for the function, if any.
+                All columns that are to be vectorized must be keys in the dictionary. Values are a
+                dictionary where the key ``embedding_type`` specifies the embedding function name
+                and ``options`` is a dictionary of keyword arguments for the function, if any.
                 ``DataframeEmbedder.get_column_embedding_function_name`` gives valid function names.
             right_df: The right dataframe to be embedded. If it's an empty dataframe, then
                 only ``left_df`` will be embedded. The index should be the default, numeric
@@ -44,9 +47,8 @@ class DataframeEmbedder:
         """
         self.left_df = left_df.copy()
         self.right_df = right_df.copy()
-        self.col_embedding_dict = self._format_col_embedding_dict(col_embedding_dict)
-        # TODO: what's actually the best data structure for holding these embedding vectors?
-        # fillna until they're the same length columns and just turn this into a dataframe?
+        self.embedding_map = embedding_map
+        # self.col_embedding_dict = self._format_col_embedding_dict(col_embedding_dict)
         self.left_embedding_attribute_dict: dict[str, np.ndarray] = {}
         self.right_embedding_attribute_dict: dict[str, np.ndarray] = {}
         self.left_embedding_matrix: np.ndarray | None = None
@@ -187,7 +189,7 @@ class DataframeEmbedder:
 
         Set `self.left_embedding_matrix` and `self.right_embedding_matrix` with
         matrix embeddings for `self.left_df` and `self.right_df`. Embed attributes
-        based on the functions for each column in `self.col_embedding_dict`.
+        based on the ``embedding_type`` functions for each column in `self.embedding_map`.
         Concatenate the embeddings for each column together into one embedding
         matrix for each dataframe. Optionally set `self.left_blocks_dict` and
         ``self.right_blocks_dict`` to be the indices of blocks within ``blocking_col``.
@@ -199,8 +201,9 @@ class DataframeEmbedder:
                 will not modify the dataframes themselves, just set the respective
                 dictionary of blocks.
         """
-        for column_name in self.col_embedding_dict:
-            vectorizer, kwargs = self.col_embedding_dict[column_name]
+        for column_name in self.embedding_map:
+            vectorizer = self.embedding_map[column_name].embedding_type
+            kwargs = self.embedding_map[column_name].options
             if hasattr(self, vectorizer):
                 vectorizer_func = getattr(self, vectorizer)
                 vectorizer_func(column_name=column_name, **kwargs)
