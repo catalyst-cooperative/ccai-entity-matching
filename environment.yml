@@ -1,6 +1,7 @@
 name: ferc1_eia_match
 channels:
   - conda-forge
+  - pytorch
   - defaults
 dependencies:
   # Packages required for setting up the environment
@@ -21,6 +22,13 @@ dependencies:
   - jupyterlab>=3.2,<3.7 # need to enforce 3.2 for splink, change later
   - nbconvert>=7,<8 # Used to clear notebook outputs in pre-commit hooks
 
+  - seaborn>=0.12,<1.0
+
   # Use pip to install the package defined by this repo for development:
   - pip:
       - --editable ./[dev,docs,tests,types]
+
+variables:
+  # fixes faiss search slowdown error
+  OMP_WAIT_POLICY: "PASSIVE"
+  OMP_NUM_THREADS: 1
