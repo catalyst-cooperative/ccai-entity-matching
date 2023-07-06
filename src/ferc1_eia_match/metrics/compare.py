@@ -3,7 +3,7 @@ import argparse
 import sys
 from pathlib import Path
 
-import mlflow
+import mlflow  # type: ignore
 import pandas as pd
 
 import pudl
