@@ -36,6 +36,11 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
 ]
+
+[project.scripts]
+compute_metrics = "ferc1_eia_match.metrics.compute:main"
+compare_metrics = "ferc1_eia_match.metrics.compare:main"
+
 keywords = []
 
 [project.urls]

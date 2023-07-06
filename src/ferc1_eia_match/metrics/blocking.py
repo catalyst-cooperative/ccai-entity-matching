@@ -53,6 +53,7 @@ def measure_blocking(
     eia_right: pd.DataFrame,
     model: config.Model,
     mlruns: Path = Path("./mlruns/"),
+    run_tags: dict | None = None,
 ):
     """Record important metrics from blocking step using mlflow."""
     mlflow.set_tracking_uri(f"file:{str(mlruns)}")
@@ -73,7 +74,7 @@ def measure_blocking(
 
     metric = model.similarity_search.distance_metric
     for k in ks:
-        with mlflow.start_run():
+        with mlflow.start_run(tags=run_tags):
             # Log model config and parameters
             mlflow.log_dict(model.dict(), "blocking_model_config")
             mlflow.log_params({"k": k})
@@ -104,7 +105,11 @@ def measure_blocking(
             )
 
 
-def execute_blocking(pudl_engine: sa.engine.Engine, mlruns: Path = Path("./mlruns/")):
+def execute_blocking(
+    pudl_engine: sa.engine.Engine,
+    mlruns: Path = Path("./mlruns/"),
+    run_tags: dict | None = None,
+):
     """Set up and measure blocking step."""
     # set configuration for model
     model_config = config.Model(**DEFAULT_CONFIG)
@@ -150,4 +155,5 @@ def execute_blocking(pudl_engine: sa.engine.Engine, mlruns: Path = Path("./mlrun
         eia_right,
         model_config,
         mlruns=mlruns,
+        run_tags=run_tags,
     )

@@ -1,0 +1,73 @@
+name: compare-metrics
+
+on:
+  pull_request_target:
+    branches:
+      - main
+
+env:
+  MLFLOW_TRACKING_URI: ~/mlruns/
+  PUDL_OUTPUT: ~/pudl-work/output/
+  PUDL_INPUT: ~/pudl-work/data/
+  EXPERIMENT_COMPARISON: ~/experiment_tracking.md
+
+jobs:
+  ci-metrics:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+
+      - name: Set up conda environment for testing
+        uses: conda-incubator/setup-miniconda@v2.2.0
+        with:
+          miniforge-variant: Mambaforge
+          miniforge-version: latest
+          use-mamba: true
+          mamba-version: "*"
+          channels: conda-forge,defaults
+          channel-priority: true
+          python-version: "3.11"
+          activate-environment: ferc1_eia_match
+          environment-file: environment.yml
+      - shell: bash -l {0}
+        run: |
+          conda info
+          conda list
+          conda config --show-sources
+          conda config --show
+          printenv | sort
+
+      - name: Download PUDL DB and log pre-test PUDL workspace contents
+        run: |
+          mkdir -p ~/pudl-work/output/
+          curl -o ~/pudl-work/output/pudl.sqlite http://intake.catalyst.coop.s3.amazonaws.com/dev/pudl.sqlite
+          find ~/pudl-work/
+
+      - name: Log SQLite3 version
+        run: |
+          conda run -n ferc1_eia_match which sqlite3
+          conda run -n ferc1_eia_match sqlite3 --version
+
+      - name: Restore metrics
+        id: cache-metrics-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: ~/mlruns/
+          key: ${{ runner.os }}-metrics
+
+      - name: Compute metrics
+        id: compute-metrics
+        run: |
+          conda run -n ferc1_eia_match compute_metrics
+
+      - name: Compare metrics
+        id: compare-metrics
+        run: |
+          conda run -n ferc1_eia_match compare_metrics ${{github.event.pull_request.base.sha}} ${{github.sha}} --output-file $EXPERIMENT_COMPARISON
+
+      - name: Attach report
+        id: attach-report
+        run: cat $EXPERIMENT_COMPARISON >> $GITHUB_STEP_SUMMARY
