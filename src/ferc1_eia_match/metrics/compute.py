@@ -38,15 +38,16 @@ def _parse_args():
     return parser.parse_args()
 
 
-def main(experiments: list[str], mlrun_uri: str, db: str):
+def main():
     """Execute experiments."""
-    pudl_engine = sa.create_engine(db)
+    args = _parse_args()
+    pudl_engine = sa.create_engine(args.db)
 
-    for experiment in experiments:
+    for experiment in args.experiments:
         match experiment:
             case "blocking":
-                blocking.execute_blocking(pudl_engine, Path(mlrun_uri))
+                blocking.execute_blocking(pudl_engine, Path(args.mlrun_uri))
 
 
 if __name__ == "__main__":
-    sys.exit(main(**vars(_parse_args())))
+    sys.exit(main())

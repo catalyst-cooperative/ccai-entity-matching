@@ -61,19 +61,16 @@ def _get_columns(columns: list[str]) -> list[str]:
     return columns
 
 
-def main(
-    base_commit: str,
-    experiment_commit: str,
-    experiment: str,
-    mlrun_uri: str,
-    output_file: str,
-):
+def main():
     """Search experiment results desired runs and write results to markdown."""
-    metrics = mlflow.search_runs(experiment_names=[experiment])
+    args = _parse_args()
+    metrics = mlflow.search_runs(experiment_names=[args.experiment])
 
-    baseline_metrics = metrics[metrics["tags.mlflow.source.git.commit"] == base_commit]
+    baseline_metrics = metrics[
+        metrics["tags.mlflow.source.git.commit"] == args.base_commit
+    ]
     experimental_metrics = metrics[
-        metrics["tags.mlflow.source.git.commit"] == experiment_commit
+        metrics["tags.mlflow.source.git.commit"] == args.experiment_commit
     ]
 
     baseline_metrics["source"] = "baseline"
@@ -83,8 +80,8 @@ def main(
     metrics = pd.concat([baseline_metrics, experimental_metrics])[columns]
     metrics.sort_values(by=["params.k"])
 
-    metrics.to_markdown(buf=output_file)
+    metrics.to_markdown(buf=args.output_file)
 
 
 if __name__ == "__main__":
-    sys.exit(main(**vars(_parse_args())))
+    sys.exit(main())
