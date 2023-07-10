@@ -40,8 +40,8 @@ classifiers = [
 keywords = []
 
 [project.scripts]
-compute-metrics = "ferc1_eia_match.metrics.compute:main"
-compare-metrics = "ferc1_eia_match.metrics.compare:main"
+compute_metrics = "ferc1_eia_match.metrics.compute:main"
+compare_metrics = "ferc1_eia_match.metrics.compare:main"
 
 [project.urls]
 "Source" = "https://https://github.com/catalyst-cooperative/ccai-entity-matching"
