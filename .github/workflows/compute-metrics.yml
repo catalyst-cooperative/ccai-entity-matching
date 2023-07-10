@@ -1,7 +1,7 @@
-name: compare-metrics
+name: compute-metrics
 
 on:
-  pull_request_target:
+  push:
     branches:
       - main
 
@@ -9,10 +9,9 @@ env:
   MLFLOW_TRACKING_URI: ~/mlruns/
   PUDL_OUTPUT: ~/pudl-work/output/
   PUDL_INPUT: ~/pudl-work/data/
-  EXPERIMENT_COMPARISON: ~/experiment_tracking.md
 
 jobs:
-  ci-compare-metrics:
+  ci-compute-metrics:
     runs-on: ubuntu-latest
 
     steps:
@@ -51,9 +50,9 @@ jobs:
           conda run -n ferc1_eia_match which sqlite3
           conda run -n ferc1_eia_match sqlite3 --version
 
-      - name: Restore metrics
-        id: cache-metrics-restore
-        uses: actions/cache/restore@v3
+      - name: Cache metrics
+        id: cache-metrics
+        uses: actions/cache@v3
         with:
           path: $MLFLOW_TRACKING_URI
           key: ${{ runner.os }}-metrics
@@ -62,12 +61,3 @@ jobs:
         id: compute-metrics
         run: |
           conda run -n ferc1_eia_match compute_metrics
-
-      - name: Compare metrics
-        id: compare-metrics
-        run: |
-          conda run -n ferc1_eia_match compare_metrics ${{github.event.pull_request.base.sha}} ${{github.sha}} --output-file $EXPERIMENT_COMPARISON
-
-      - name: Attach report
-        id: attach-report
-        run: cat $EXPERIMENT_COMPARISON >> $GITHUB_STEP_SUMMARY
