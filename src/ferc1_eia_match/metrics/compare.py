@@ -68,7 +68,7 @@ def main(
     mlrun_uri: str,
     output_file: str,
 ):
-    """Execute experiments."""
+    """Search experiment results desired runs and write results to markdown."""
     metrics = mlflow.search_runs(experiment_names=[experiment])
 
     baseline_metrics = metrics[metrics["tags.mlflow.source.git.commit"] == base_commit]
