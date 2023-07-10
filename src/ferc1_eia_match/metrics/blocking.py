@@ -112,7 +112,7 @@ def execute_blocking(
 ):
     """Set up and measure blocking step."""
     # set configuration for model
-    model_config = config.Model(**DEFAULT_CONFIG)
+    model_config = config.Model(**DEFAULT_CONFIG)  # type: ignore
 
     model_inputs = inputs.InputManager(
         pudl_engine=pudl_engine,
@@ -129,7 +129,7 @@ def execute_blocking(
     embedder = candidate_set_creation.DataframeEmbedder(
         left_df=ferc_left,
         right_df=eia_right,
-        col_embedding_dict=model_config.embedding.get_formatted_embedding(),
+        embedding_map=model_config.embedding.embedding_map,
     )
     embedder.embed_dataframes(blocking_col=model_config.embedding.blocking_col)
 
