@@ -39,6 +39,7 @@ jobs:
           conda config --show-sources
           conda config --show
           printenv | sort
+          ls /usr/share/miniconda3/envs/ferc1_eia_match/bin/
 
       - name: Download PUDL DB and log pre-test PUDL workspace contents
         run: |
