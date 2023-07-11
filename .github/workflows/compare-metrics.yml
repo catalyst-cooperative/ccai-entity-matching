@@ -40,6 +40,14 @@ jobs:
           conda config --show
           printenv | sort
 
+      - name: Check executables
+        run: ls /usr/share/miniconda3/envs/ferc1_eia_match/bin/
+
+      - name: Compute metrics
+        id: compute-metrics
+        run: |
+          conda run -n ferc1_eia_match compute_metrics
+
       - name: Download PUDL DB and log pre-test PUDL workspace contents
         run: |
           mkdir -p ~/pudl-work/output/
