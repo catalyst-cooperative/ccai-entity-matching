@@ -116,6 +116,7 @@ def execute_blocking(
     # set configuration for model
     model_config = config.Model(**DEFAULT_CONFIG)  # type: ignore
 
+    logger.info("Prepping inputs for blocking")
     model_inputs = inputs.InputManager(
         pudl_engine=pudl_engine,
         start_report_year=model_config.inputs.start_year,
@@ -128,6 +129,7 @@ def execute_blocking(
     ferc_left = ferc_df[model_config.embedding.matching_cols].reset_index()
     eia_right = eia_df[model_config.embedding.matching_cols].reset_index()
 
+    logger.info("Embed dataframes")
     embedder = candidate_set_creation.DataframeEmbedder(
         left_df=ferc_left,
         right_df=eia_right,
@@ -135,6 +137,7 @@ def execute_blocking(
     )
     embedder.embed_dataframes(blocking_col=model_config.embedding.blocking_col)
 
+    logger.info("Create similarity searcher for blocking")
     searcher = candidate_set_creation.SimilaritySearcher(
         query_embedding_matrix=embedder.left_embedding_matrix,
         menu_embedding_matrix=embedder.right_embedding_matrix,
