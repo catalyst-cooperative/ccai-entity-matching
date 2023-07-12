@@ -56,6 +56,7 @@ def measure_blocking(
     run_tags: dict | None = None,
 ):
     """Record important metrics from blocking step using mlflow."""
+    logger.info(f"Starting blocking experiment and saving results at {mlruns}")
     mlflow.set_tracking_uri(f"file:{str(mlruns)}")
     mlflow.set_experiment(experiment_name="blocking")
 
@@ -74,6 +75,7 @@ def measure_blocking(
 
     metric = model.similarity_search.distance_metric
     for k in ks:
+        logger.info(f"Run blocking with k={k}")
         with mlflow.start_run(tags=run_tags):
             # Log model config and parameters
             mlflow.log_dict(model.dict(), "blocking_model_config")
