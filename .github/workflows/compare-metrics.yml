@@ -62,12 +62,12 @@ jobs:
       - name: Compute metrics
         id: compute-metrics
         run: |
-          conda run -n ferc1_eia_match compute_metrics
+          conda run -v --live-stream -n ferc1_eia_match compute_metrics
 
       - name: Compare metrics
         id: compare-metrics
         run: |
-          conda run -n ferc1_eia_match compare_metrics ${{github.event.pull_request.base.sha}} ${{github.sha}} --output-file $EXPERIMENT_COMPARISON
+          conda run -v --live-stream -n ferc1_eia_match compare_metrics ${{github.event.pull_request.base.sha}} ${{github.sha}} --output-file $EXPERIMENT_COMPARISON
 
       - name: Attach report
         id: attach-report
