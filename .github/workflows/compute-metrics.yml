@@ -61,4 +61,4 @@ jobs:
       - name: Compute metrics
         id: compute-metrics
         run: |
-          conda run -n ferc1_eia_match compute_metrics
+          conda run -v --live-stream -n ferc1_eia_match compute_metrics
