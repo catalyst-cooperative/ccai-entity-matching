@@ -15,35 +15,6 @@ from ferc1_eia_match import candidate_set_creation, config, inputs
 
 logger = logging.getLogger(__name__)
 
-# Default config
-DEFAULT_CONFIG = {
-    "inputs": {
-        "start_year": 2019,
-        "end_year": 2020,
-    },
-    "embedding": {
-        "embedding_map": {
-            "plant_name": {"embedding_type": "tfidf_vectorize"},
-            "utility_name": {"embedding_type": "tfidf_vectorize"},
-            "fuel_type_code_pudl": {"embedding_type": "tfidf_vectorize"},
-            "installation_year": {"embedding_type": "min_max_scale"},
-            "construction_year": {"embedding_type": "min_max_scale"},
-            "capacity_mw": {"embedding_type": "min_max_scale"},
-        },
-        "matching_cols": [
-            "plant_name",
-            "utility_name",
-            "installation_year",
-            "construction_year",
-            "fuel_type_code_pudl",
-            "capacity_mw",
-            "report_year",
-        ],
-        "blocking_col": "report_year",
-    },
-    "similarity_search": {"distance_metric": "l2_distance_search"},
-}
-
 
 def measure_blocking(
     candidate_matcher: Callable,
@@ -55,7 +26,18 @@ def measure_blocking(
     mlruns: Path = Path("./mlruns/"),
     run_tags: dict | None = None,
 ):
-    """Record important metrics from blocking step using mlflow."""
+    """Record a set of runs of the blocking step for each requested k value.
+
+    Args:
+        candidate_matcher: A function to generate a set of candidate matches.
+        ks: List of k values to test.
+        train_df: Dataframe of training data.
+        ferc_left: FERC input data.
+        eia_right: EIA input data.
+        model: Configuration of model to be logged by mlflow.
+        mlruns: Path to mlflow tracking directory.
+        run_tags: Tags to help filter mlflow runs.
+    """
     logger.info(f"Starting blocking experiment and saving results at {mlruns}")
     mlflow.set_tracking_uri(f"file:{str(mlruns)}")
     mlflow.set_experiment(experiment_name="blocking")
@@ -107,15 +89,39 @@ def measure_blocking(
             )
 
 
-def execute_blocking(
+def run_blocking_tests(
     pudl_engine: sa.engine.Engine,
     mlruns: Path = Path("./mlruns/"),
     run_tags: dict | None = None,
+    config_dict: dict | None = None,
+    config_file: str | None = None,
     ks: list[int] = [5, 10, 15, 20, 25, 30, 40, 50],
 ):
-    """Set up and measure blocking step."""
+    """Set up and measure blocking step.
+
+    This function provides a repeatable test of the blocking step. It will prepare
+    all input data and call measure_blocking.
+
+    Args:
+        pudl_engine: PUDL DB connection.
+        mlruns: Path to mlruns directory.
+        run_tags: Tags for filtering experiments.
+        config_dict: Dictionary of model config will override a config_file.
+        config_file: Dictionary of model config will override a config_file.
+        ks: List of k values to test.
+    """
     # set configuration for model
-    model_config = config.Model(**DEFAULT_CONFIG)  # type: ignore
+    config_source = importlib.resources.files("ferc1_eia_match.package_data").joinpath(
+        "blocking_config.json"
+    )
+    with importlib.resources.as_file(config_source) as json_file:
+        model_config = config.Model.from_json(json_file)
+
+    if config_file:
+        model_config = config.Model.from_json(json_file)
+
+    if config_dict:
+        model_config = config.Model(**config_dict)  # type: ignore
 
     # Prep inputs
     logger.info("Prepping inputs for blocking")

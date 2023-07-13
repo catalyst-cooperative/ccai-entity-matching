@@ -1,0 +1,27 @@
+{
+    "inputs": {
+        "start_year": 2019,
+        "end_year": 2020
+    },
+    "embedding": {
+        "embedding_map": {
+            "plant_name": {"embedding_type": "tfidf_vectorize"},
+            "utility_name": {"embedding_type": "tfidf_vectorize"},
+            "fuel_type_code_pudl": {"embedding_type": "tfidf_vectorize"},
+            "installation_year": {"embedding_type": "min_max_scale"},
+            "construction_year": {"embedding_type": "min_max_scale"},
+            "capacity_mw": {"embedding_type": "min_max_scale"}
+        },
+        "matching_cols": [
+            "plant_name",
+            "utility_name",
+            "installation_year",
+            "construction_year",
+            "fuel_type_code_pudl",
+            "capacity_mw",
+            "report_year"
+        ],
+        "blocking_col": "report_year"
+    },
+    "similarity_search": {"distance_metric": "l2_distance_search"}
+}
