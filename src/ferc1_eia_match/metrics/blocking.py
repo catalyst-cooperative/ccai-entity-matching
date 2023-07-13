@@ -111,11 +111,13 @@ def execute_blocking(
     pudl_engine: sa.engine.Engine,
     mlruns: Path = Path("./mlruns/"),
     run_tags: dict | None = None,
+    ks: list[int] = [5, 10, 15, 20, 25, 30, 40, 50],
 ):
     """Set up and measure blocking step."""
     # set configuration for model
     model_config = config.Model(**DEFAULT_CONFIG)  # type: ignore
 
+    # Prep inputs
     logger.info("Prepping inputs for blocking")
     model_inputs = inputs.InputManager(
         pudl_engine=pudl_engine,
@@ -151,7 +153,6 @@ def execute_blocking(
     )
     with importlib.resources.as_file(pkg_source) as csv_file:
         train_df = pd.read_csv(csv_file)
-    ks = [5, 10, 15, 20, 25, 30, 40, 50]
     measure_blocking(
         searcher.run_candidate_pair_search,
         ks,
