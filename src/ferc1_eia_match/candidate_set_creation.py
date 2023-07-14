@@ -4,10 +4,12 @@ import logging
 import faiss
 import numpy as np
 import pandas as pd
-from dagster import AssetOut, Config, multi_asset
+from dagster import AssetOut, multi_asset
 from scipy.sparse import hstack, issparse
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import MinMaxScaler
+
+from ferc1_eia_match.config import EmbeddingConfig
 
 logger = logging.getLogger(__name__)
 
@@ -140,21 +142,6 @@ def set_col_blocks(
     return left_blocks_dict, right_blocks_dict
 
 
-class ColumnEmbedding(Config):
-    """Specify embedding vectorizer to use for column and any options."""
-
-    embedding_type: str
-    options: dict = {}
-
-
-class EmbeddingConfig(Config):
-    """Configuration options for embed_dataframes."""
-
-    embedding_map: dict[str, ColumnEmbedding]
-    matching_cols: list[str]
-    blocking_col: str
-
-
 @multi_asset(
     outs={
         "ferc_embedded": AssetOut(),
@@ -209,16 +196,6 @@ def embed_dataframes(
     logger.info(f"right_embedding_size: {right_embedding_matrix.shape}")
 
     return pd.DataFrame(left_embedding_matrix), pd.DataFrame(right_embedding_matrix)
-
-
-"""
-    if blocking_col != "":
-        self.set_col_blocks(blocking_col=blocking_col)
-    else:
-        # if there's no blocking col, then there's just one block with all records
-        self.left_blocks_dict["all records"] = self.left_df.index
-        self.right_blocks_dict["all records"] = self.right_df.index
-"""
 
 
 class SimilaritySearcher:

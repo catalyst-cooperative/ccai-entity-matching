@@ -20,6 +20,7 @@ dependencies = [
     "pandas>=1.5,<2.0",
     "sqlalchemy>=1.4,<2.0",
     "catalystcoop-pudl @ git+https://github.com/catalyst-cooperative/pudl@dev",
+    "mlflow>=2.4.1,<2.5.0",
     "scipy>=1.10,<2.0",
     "splink>=3.7.2,<4.0",
     "faiss-cpu>=1.7.3,<2.0",
@@ -37,7 +38,12 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
 ]
+
 keywords = []
+
+[project.scripts]
+compute_metrics = "ferc1_eia_match.metrics.compute:main"
+compare_metrics = "ferc1_eia_match.metrics.compare:main"
 
 [project.urls]
 "Source" = "https://https://github.com/catalyst-cooperative/ccai-entity-matching"
@@ -46,9 +52,9 @@ keywords = []
 
 [project.optional-dependencies]
 dev = [
-    "black>=22.0,<23.4",  # A deterministic code formatter
+    "black>=22.0,<23.8",  # A deterministic code formatter
     "isort>=5.0,<5.13",  # Standardized import sorting
-    "tox>=3.20,<4.6",  # Python test environment manager
+    "tox>=3.20,<4.7",  # Python test environment manager
     "twine>=3.3,<4.1",  # Used to make releases to PyPI
 ]
 docs = [
@@ -70,17 +76,17 @@ tests = [
     "flake8-use-fstring>=1.0,<1.5",  # Highlight use of old-style string formatting
     "jupyter", # For integration testing Jupyter notebooks
     "mccabe>=0.6,<0.8",  # Checks that code isn't overly complicated
-    "mypy>=0.942,<1.4",  # Static type checking
+    "mypy>=0.942,<1.5",  # Static type checking
     "nbconvert>=7,<8",
     "nbformat>=5,<6",
     "pep8-naming>=0.12,<0.14",  # Require PEP8 compliant variable names
     "pre-commit>=2.9,<3.4",  # Allow us to run pre-commit hooks in testing
     "pydocstyle>=5.1,<6.4",  # Style guidelines for Python documentation
-    "pytest>=6.2,<7.4",  # Our testing framework
+    "pytest>=6.2,<7.5",  # Our testing framework
     "pytest-console-scripts>=1.1,<1.5",  # Allow automatic testing of scripts
     "pytest-cov>=2.10,<4.2",  # Pytest plugin for working with coverage
     "rstcheck[sphinx]>=5.0,<6.2",  # ReStructuredText linter
-    "tox>=3.20,<4.6",  # Python test environment manager
+    "tox>=3.20,<4.7",  # Python test environment manager
 ]
 types = [
     "types-setuptools",
