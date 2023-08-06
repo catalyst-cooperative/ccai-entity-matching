@@ -20,6 +20,7 @@ dependencies = [
     "pandas>=1.5,<2.0",
     "sqlalchemy>=1.4,<2.0",
     "catalystcoop-pudl @ git+https://github.com/catalyst-cooperative/pudl@dev",
+    "mlflow>=2.4.1,<2.5.0",
     "scipy>=1.10,<2.0",
     "splink>=3.7.2,<4.0",
     "faiss-cpu>=1.7.3,<2.0"
@@ -35,7 +36,12 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
 ]
+
 keywords = []
+
+[project.scripts]
+compute_metrics = "ferc1_eia_match.metrics.compute:main"
+compare_metrics = "ferc1_eia_match.metrics.compare:main"
 
 [project.urls]
 "Source" = "https://https://github.com/catalyst-cooperative/ccai-entity-matching"
@@ -44,7 +50,7 @@ keywords = []
 
 [project.optional-dependencies]
 dev = [
-    "black>=22.0,<23.4",  # A deterministic code formatter
+    "black>=22.0,<23.8",  # A deterministic code formatter
     "isort>=5.0,<5.13",  # Standardized import sorting
     "tox>=3.20,<4.7",  # Python test environment manager
     "twine>=3.3,<4.1",  # Used to make releases to PyPI
@@ -52,7 +58,7 @@ dev = [
 docs = [
     "doc8>=0.9,<1.2",  # Ensures clean documentation formatting
     "furo>=2022.4.7",
-    "sphinx>=4,!=5.1.0,<7.0.2",  # The default Python documentation engine
+    "sphinx>=4,!=5.1.0,<7.1.3",  # The default Python documentation engine
     "sphinx-autoapi>=1.8,<2.2",  # Generates documentation from docstrings
     "sphinx-issues>=1.2,<3.1",  # Allows references to GitHub issues
 ]
@@ -60,7 +66,7 @@ tests = [
     "bandit>=1.6,<1.8",  # Checks code for security issues
     "coverage>=5.3,<7.3",  # Lets us track what code is being tested
     "doc8>=0.9,<1.2",  # Ensures clean documentation formatting
-    "flake8>=4.0,<6.1",  # A framework for linting & static analysis
+    "flake8>=4.0,<6.2",  # A framework for linting & static analysis
     "flake8-builtins>=1.5,<2.2",  # Avoid shadowing Python built-in names
     "flake8-colors>=0.1,<0.2",  # Produce colorful error / warning output
     "flake8-docstrings>=1.5,<1.8",  # Ensure docstrings are formatted well
