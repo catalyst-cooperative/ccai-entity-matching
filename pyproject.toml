@@ -20,6 +20,7 @@ dependencies = [
     "pandas>=1.5,<2.0",
     "sqlalchemy>=1.4,<2.0",
     "catalystcoop-pudl @ git+https://github.com/catalyst-cooperative/pudl@dev",
+    "mlflow>=2.4.1,<2.5.0",
     "scipy>=1.10,<2.0",
     "splink>=3.7.2,<4.0",
     "faiss-cpu>=1.7.3,<2.0"
@@ -35,7 +36,12 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.11",
 ]
+
 keywords = []
+
+[project.scripts]
+compute_metrics = "ferc1_eia_match.metrics.compute:main"
+compare_metrics = "ferc1_eia_match.metrics.compare:main"
 
 [project.urls]
 "Source" = "https://https://github.com/catalyst-cooperative/ccai-entity-matching"

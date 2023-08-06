@@ -36,14 +36,21 @@ jobs:
           conda config --show
           printenv | sort
 
-      # - name: Cache PUDL DB
-      # uses: actions/cache@v3.3.1
-      # with:
-      # path: ~/pudl-work/output/pudl.sqlite
-      # The last time we deployed Datasette. Update if we redeploy.
-      # key: "2022-05-05"
+      - name: Get Date
+        id: get-date
+        run: |
+          echo "date=$(/bin/date -u "+%Y%m%d")" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Cache PUDL DB
+        id: cache-db
+        uses: actions/cache@v3.3.1
+        with:
+          path: ~/pudl-work/output/pudl.sqlite
+          key: ${{ steps.get-date.outputs.date }}
 
       - name: Download PUDL DB and log pre-test PUDL workspace contents
+        if: steps.cache-db.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/pudl-work/output/
           curl -o ~/pudl-work/output/pudl.sqlite http://intake.catalyst.coop.s3.amazonaws.com/dev/pudl.sqlite
