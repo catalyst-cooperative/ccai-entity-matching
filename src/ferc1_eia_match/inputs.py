@@ -10,6 +10,8 @@ from ferc1_eia_match.name_cleaner import CompanyNameCleaner
 
 logger = logging.getLogger(__name__)
 
+TRAIN_CSV_FILENAME = "ferc1_eia_train.csv"
+
 
 class InputManager:
     """Class to prepare FERC1 and EIA data for matching."""
@@ -35,16 +37,16 @@ class InputManager:
                 and all plant parts will be included in the EIA data.
         """
         self.pudl_engine = pudl_engine
-        start_date = None
-        end_date = None
+        self.start_date = None
+        self.end_date = None
         if start_report_year is not None:
-            start_date = str(start_report_year) + "-01-01"
+            self.start_date = str(start_report_year) + "-01-01"
         if end_report_year is not None:
-            end_date = str(end_report_year) + "-12-31"
+            self.end_date = str(end_report_year) + "-12-31"
         self.pudl_out = pudl.output.pudltabl.PudlTabl(
             pudl_engine,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=self.start_date,
+            end_date=self.end_date,
             freq="AS",
         )
         # use default rules for utility_name
@@ -68,6 +70,7 @@ class InputManager:
         )
         self.eia_df = None
         self.ferc1_df = None
+        self.non_distinct_plant_parts_eia = None
         if (
             eia_plant_part is not None
             and eia_plant_part not in pudl.analysis.plant_parts_eia.PLANT_PARTS
@@ -232,6 +235,10 @@ class InputManager:
         plant_parts_eia = plant_parts_eia[
             ~plant_parts_eia.index.duplicated(keep="first")
         ]
+
+        # TODO: don't save this variable once PPE is dagsterized
+        # used for train connections
+        self.non_distinct_plant_parts_eia = plant_parts_eia
         # make plant_parts_eia distinct
         plant_parts_eia = plant_parts_eia[
             (plant_parts_eia["true_gran"]) & (~plant_parts_eia["ownership_dupe"])
@@ -290,3 +297,44 @@ class InputManager:
         self.eia_df = plant_parts_eia
 
         return plant_parts_eia
+
+    def get_training_data(self, plant_parts_eia: pd.DataFrame | None = None):
+        """Get FERC1 to EIA training data from PUDL analysis module.
+
+        FERC1 records will be matched to their true granulity EIA match and training
+        data will be restricted to the data range defined by ``start_report_year`` and
+        ``end_report_year``.
+
+        Arguments:
+            plant_parts_eia: Optionally pass in the plant parts list (non distinct).
+                Otherwise, it is generated in ``get_eia_input``.
+
+        Returns:
+            train_df: Training data connected at the true granularity with columns
+                for ``record_id_eia`` and ``record_id_ferc1`` as well as a signature
+                and notes for each match.
+        """
+        # TODO: when PPE is dagsterized just grab it from the DB
+        # get training data connected at the true granularity
+        if plant_parts_eia is not None:
+            train_df = pudl.analysis.ferc1_eia.prep_train_connections(
+                self.non_distinct_plant_parts_eia,
+                start_date=self.start_date,
+                end_date=self.end_date,
+            ).reset_index()
+        else:
+            if self.non_distinct_plant_parts_eia is None:
+                self.get_eia_input()
+            train_df = pudl.analysis.ferc1_eia.prep_train_connections(
+                self.non_distinct_plant_parts_eia,
+                start_date=self.start_date,
+                end_date=self.end_date,
+            ).reset_index()
+
+        train_df = pudl.analysis.ferc1_eia.restrict_train_connections_on_date_range(
+            train_df,
+            "record_id_eia",
+            start_date=self.start_date,
+            end_date=self.end_date,
+        )
+        return train_df
