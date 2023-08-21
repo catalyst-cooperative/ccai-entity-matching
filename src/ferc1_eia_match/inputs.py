@@ -197,11 +197,6 @@ class InputManager:
         # nullify negative capacity and round values
         plants_ferc1_df.loc[plants_ferc1_df.capacity_mw <= 0, "capacity_mw"] = None
         plants_ferc1_df = plants_ferc1_df.round({"capacity_mw": 2})
-        # basic string cleaning
-        str_cols = ["utility_name_ferc1", "plant_name_ferc1"]
-        plants_ferc1_df[str_cols] = plants_ferc1_df[str_cols].apply(
-            lambda x: x.str.strip().str.lower()
-        )
         plants_ferc1_df = (
             plants_ferc1_df.pipe(
                 self.utility_name_cleaner.get_clean_df,
@@ -264,7 +259,6 @@ class InputManager:
         plant_parts_eia = pd.concat(
             [non_null_df, plant_parts_eia[plant_parts_eia.utility_id_eia.isnull()]]
         ).reindex(plant_parts_eia.index)
-        # utility_name_eia will be renamed in company name cleaning step
         plant_parts_eia = plant_parts_eia.astype(
             {
                 "plant_name_eia": "string",
@@ -279,11 +273,6 @@ class InputManager:
         # nullify negative capacity and round values
         plant_parts_eia.loc[plant_parts_eia.capacity_mw <= 0, "capacity_mw"] = None
         plant_parts_eia = plant_parts_eia.round({"capacity_mw": 2})
-        # basic string cleaning
-        str_cols = ["utility_name_eia", "plant_name_eia"]
-        plant_parts_eia[str_cols] = plant_parts_eia[str_cols].apply(
-            lambda x: x.str.strip().str.lower()
-        )
         plant_parts_eia = (
             plant_parts_eia.pipe(
                 self.utility_name_cleaner.get_clean_df,
