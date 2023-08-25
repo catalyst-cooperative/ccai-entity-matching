@@ -222,8 +222,12 @@ class DataframeEmbedder:
             self.set_col_blocks(blocking_col=blocking_col)
         else:
             # if there's no blocking col, then there's just one block with all records
-            self.left_blocks_dict["all records"] = self.left_df.index
-            self.right_blocks_dict["all records"] = self.right_df.index
+            self.left_blocks_dict["all records"] = self.left_df.reset_index(
+                drop=True
+            ).index
+            self.right_blocks_dict["all records"] = self.right_df.reset_index(
+                drop=True
+            ).index
 
 
 class SimilaritySearcher:

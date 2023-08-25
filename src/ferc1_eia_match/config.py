@@ -24,7 +24,7 @@ class EmbeddingConfig(BaseModel):
 
     embedding_map: dict[str, ColumnEmbedding]
     matching_cols: list[str]
-    blocking_col: str
+    blocking_col: str = ""
 
 
 class SimilaritySearch(BaseModel):
