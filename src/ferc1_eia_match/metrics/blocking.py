@@ -64,7 +64,7 @@ def measure_blocking(
             mlflow.log_params({"k": k})
 
             # Run blocking
-            candidate_set = candidate_matcher(k, metric)
+            candidate_set, _ = candidate_matcher(k, metric)
 
             # Compute % that capture match in candidate set
             pair_is_correct = np.in1d(eia_train_idx, candidate_set[ferc_train_idx])
