@@ -295,9 +295,11 @@ class SimilaritySearcher:
                 ``self.menu_embedding_matrix``.
 
         Returns:
-            Numpy array of shape ``(len(query_embeddings), k)`` where each row represents
-            the k indices of the index embeddings matrix that are closest to each query
-            vector.
+            match indices: Numpy array of shape ``(len(query_embeddings), k)`` where each
+                row represents the k indices of the menu embeddings matrix that are
+                closest to each query vector.
+            distances: Numpy array giving the distances from each query vector to
+                corresponding menu vector in ``match_indices``.
         """
         menu = self.menu_embedding_matrix[menu_idx]
         queries = self.query_embedding_matrix[queries_idx]
@@ -306,7 +308,7 @@ class SimilaritySearcher:
         index.add_with_ids(menu, menu_idx)
         distances, match_indices = index.search(queries, k)
 
-        return match_indices
+        return match_indices, distances
 
     def cosine_similarity_search(
         self, queries_idx: np.ndarray, menu_idx: np.ndarray, k: int
@@ -325,9 +327,11 @@ class SimilaritySearcher:
                 ``self.menu_embedding_matrix``.
 
         Returns:
-            Numpy array of shape ``(len(query_embeddings), k)`` where each row represents
-            the k indices of the menu embeddings matrix that are closest to each query
-            vector.
+            match indices: Numpy array of shape ``(len(query_embeddings), k)`` where each
+                row represents the k indices of the menu embeddings matrix that are
+                closest to each query vector.
+            distances: Numpy array giving the distances from each query vector to
+                corresponding menu vector in ``match_indices``.
         """
         menu = self.menu_embedding_matrix[menu_idx]
         queries = self.query_embedding_matrix[queries_idx]
@@ -339,7 +343,7 @@ class SimilaritySearcher:
         index.add_with_ids(menu, menu_idx)
         distances, match_indices = index.search(queries, k)
 
-        return match_indices
+        return match_indices, distances
 
     def get_search_function_names(self) -> list[str]:
         """Get the names of available search functions."""
@@ -361,22 +365,25 @@ class SimilaritySearcher:
                 by ``SimilaritySearcher.get_search_function_names``.
 
         Returns:
-            A candidate set of length ``(self.query_embedding_matrix.shape[0], k)``
-            where each row is a list of the indices of the k best menu vectors for the
-            query vector at that index.
+            candidate_set: A candidate set of length ``(self.query_embedding_matrix.shape[0], k)``
+                where each row is a list of the indices of the k best menu vectors for the
+                query vector at that index.
+            distances: Distances from each query vector to menu vector in ``candidate_set``.
         """
         # a (currently empty) array of the k best right matches for each left record
         candidate_set = np.empty((self.query_embedding_matrix.shape[0], k))
+        distances = np.empty((self.query_embedding_matrix.shape[0], k))
         for block_key in self.query_blocks_dict:
             print(f"Conducting search for candidate pairs on the {block_key} block")
             left_idx = self.query_blocks_dict[block_key].to_numpy()
             right_idx = self.menu_blocks_dict[block_key].to_numpy()
             if hasattr(self, search_name):
                 search_func = getattr(self, search_name)
-                block_candidate_set = search_func(
+                block_candidate_set, block_distances = search_func(
                     queries_idx=left_idx, menu_idx=right_idx, k=k
                 )
             else:
                 raise ValueError(f"Search function {search_name} does not exist.")
             candidate_set[left_idx] = block_candidate_set
-        return candidate_set
+            distances[left_idx] = block_distances
+        return candidate_set, distances
