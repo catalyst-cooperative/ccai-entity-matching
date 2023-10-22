@@ -49,12 +49,25 @@ jobs:
           path: ~/pudl-work/output/pudl.sqlite
           key: ${{ steps.get-date.outputs.date }}
 
-      - name: Download PUDL DB and log pre-test PUDL workspace contents
+      - name: Check Cache and Download PUDL DB
         if: steps.cache-db.outputs.cache-hit != 'true'
         run: |
-          mkdir -p ~/pudl-work/output/
-          curl -o ~/pudl-work/output/pudl.sqlite http://intake.catalyst.coop.s3.amazonaws.com/dev/pudl.sqlite
-          find ~/pudl-work/
+          if [ -f commit_hash.txt ] && [ -f sha256_hash.txt ]; then
+            CACHED_COMMIT_HASH=$(cat commit_hash.txt)
+            CACHED_SHA256_HASH=$(cat sha256_hash.txt)
+            if [ "$CACHED_COMMIT_HASH" = "$GITHUB_SHA" ] && [ "$CACHED_SHA256_HASH" = "$(python -c "import hashlib; m = hashlib.sha256(); m.update(open('~/pudl-work/output/pudl.sqlite', 'rb').read()); print(m.hexdigest())")" ]; then
+              echo "Cache is up to date. Skipping download."
+            else
+              echo "Cache is outdated. Downloading a new DB."
+              # Download the PUDL DB here
+              curl -o ~/pudl-work/output/pudl.sqlite http://intake.catalyst.coop.s3.amazonaws.com/dev/pudl.sqlite
+            fi
+          else
+            echo "Cache is missing. Downloading a new DB."
+            # Download the PUDL DB here
+            curl -o ~/pudl-work/output/pudl.sqlite http://intake.catalyst.coop.s3.amazonaws.com/dev/pudl.sqlite
+          fi
+          find ~/pudl-work/  
 
       - name: Log SQLite3 version
         run: |
