@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import hstack, issparse
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 
 from ferc1_eia_match.config import ColumnEmbedding
 
@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 class DataframeEmbedder:
     """A class for creating an embedding matrix for one dataframe or a pair of dataframes."""
 
-    column_embedding_functions = ["min_max_scale", "tfidf_vectorize"]
+    # TODO: dynamically generate based on functions in superclass?
+    column_embedding_functions = ["min_max_scale", "tfidf_vectorize", "one_hot_encode"]
 
     def __init__(
         self,
@@ -74,6 +75,37 @@ class DataframeEmbedder:
             key: (func_name, {}) if len(kwargs) == 0 else (func_name, kwargs[0])
             for key, (func_name, *kwargs) in col_embedding_dict.items()
         }
+
+    # TODO: make a superclass for these embedding functions
+    def one_hot_encode(self, column_name: str, kwargs: dict = {}) -> None:
+        """Column embedding function: One hot encode a column.
+
+        Arguments:
+            column_name: Name of the column in the dataframe to vectorize.
+            kwargs: Keyword arguments for the sklearn TfidfVectorizer object.
+        """
+        logger.info(f"One hot encoding {column_name}.")
+        # fill nulls with the empty string so they become 0 vectors
+        if column_name in self.left_df.columns:
+            left_series = self.left_df[column_name].fillna("")
+        else:
+            raise AssertionError(
+                f"{column_name} is not in left dataframe columns. Can't vectorize."
+            )
+        if self.right_df.empty:
+            right_series = pd.Series()
+        elif column_name in self.right_df.columns:
+            right_series = self.right_df[column_name].fillna("")
+        else:
+            raise AssertionError(
+                f"{column_name} is not in right dataframe columns. Can't vectorize."
+            )
+        encoder = OneHotEncoder(**kwargs)
+        encoder.fit(pd.concat([left_series, right_series]))
+        self.left_embedding_attribute_dict[column_name] = encoder.transform(left_series)
+        self.right_embedding_attribute_dict[column_name] = encoder.transform(
+            right_series
+        )
 
     def tfidf_vectorize(self, column_name: str, kwargs: dict = {}) -> None:
         """Column embedding function: Use TF-IDF to create vector embeddings for a column.

@@ -17,10 +17,10 @@ requires-python = ">=3.11,<3.12"
 dynamic = ["version"]
 license = {file = "LICENSE.txt"}
 dependencies = [
-    "pandas>=1.5,<2.0",
+    "pandas>=2.0,<2.2",
     "sqlalchemy>=1.4,<2.0",
     "catalystcoop-pudl @ git+https://github.com/catalyst-cooperative/pudl@dev",
-    "mlflow>=2.4.1,<2.7.0",
+    "mlflow>=2.6,<2.7.1",
     "scipy>=1.10,<2.0",
     "splink>=3.7.2,<4.0",
     "faiss-cpu>=1.7.3,<2.0"
