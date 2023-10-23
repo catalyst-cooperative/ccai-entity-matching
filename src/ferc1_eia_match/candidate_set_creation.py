@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import hstack, issparse
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from sklearn.preprocessing import MinMaxScaler, Normalizer, OneHotEncoder
 
 from ferc1_eia_match.config import ColumnEmbedding
 
@@ -17,7 +17,12 @@ class DataframeEmbedder:
     """A class for creating an embedding matrix for one dataframe or a pair of dataframes."""
 
     # TODO: dynamically generate based on functions in superclass?
-    column_embedding_functions = ["min_max_scale", "tfidf_vectorize", "one_hot_encode"]
+    column_embedding_functions = [
+        "min_max_scale",
+        "tfidf_vectorize",
+        "one_hot_encode",
+        "min_max_scale_normalize_df",
+    ]
 
     def __init__(
         self,
@@ -49,7 +54,6 @@ class DataframeEmbedder:
         self.left_df = left_df.copy()
         self.right_df = right_df.copy()
         self.embedding_map = embedding_map
-        # self.col_embedding_dict = self._format_col_embedding_dict(col_embedding_dict)
         self.left_embedding_attribute_dict: dict[str, np.ndarray] = {}
         self.right_embedding_attribute_dict: dict[str, np.ndarray] = {}
         self.left_embedding_matrix: np.ndarray | None = None
@@ -60,29 +64,13 @@ class DataframeEmbedder:
         # TODO: incorporate dictionary for choosing how to handle nulls
         # self.null_handling_dict = null_handling_dict
 
-    def _format_col_embedding_dict(self, col_embedding_dict) -> dict:
-        """Format column embedding dictionary.
-
-        Keys are the name of the column, values are a tuple with the name of the embedding
-        function and a dictionary of keyword arguments for the embedding function. If there are
-        no keyword arguments then the dictionary is empty.
-
-        Arguments:
-            col_embedding_dict: The dictionary to be formatted. Keys are function names and
-                values are a list with the function name and optionally keyword arguments.
-        """
-        return {
-            key: (func_name, {}) if len(kwargs) == 0 else (func_name, kwargs[0])
-            for key, (func_name, *kwargs) in col_embedding_dict.items()
-        }
-
     # TODO: make a superclass for these embedding functions
     def one_hot_encode(self, column_name: str, kwargs: dict = {}) -> None:
         """Column embedding function: One hot encode a column.
 
         Arguments:
             column_name: Name of the column in the dataframe to vectorize.
-            kwargs: Keyword arguments for the sklearn TfidfVectorizer object.
+            kwargs: Keyword arguments for the sklearn OneHotEncoder object.
         """
         logger.info(f"One hot encoding {column_name}.")
         # fill nulls with the empty string so they become 0 vectors
@@ -177,6 +165,50 @@ class DataframeEmbedder:
         scaler.fit(full_array)
         self.left_embedding_attribute_dict[column_name] = scaler.transform(left_array)
         self.right_embedding_attribute_dict[column_name] = scaler.transform(right_array)
+
+    def min_max_scale_normalize_df(
+        self, column_names: list[str], feature_range: tuple = (0, 1)
+    ):
+        """Min max scale a set of columns and then normalize records composed of the columns.
+
+        Arguments:
+            column_names: A list of the names of the columns in the left and right
+                dataframes to scale to the feature range.
+            feature_range: The desired range of the transformed data.
+        """
+        if set(column_names).issubset(self.left_df.columns):
+            left_df = self.left_df[column_names]
+        else:
+            raise AssertionError(
+                f"{column_names} are not in left dataframe columns. Can't vectorize."
+            )
+        if self.right_df.empty:
+            right_df = pd.DataFrame()
+        elif set(column_names).issubset(self.right_df.columns):
+            right_df = self.right_df[column_names]
+        else:
+            raise AssertionError(
+                f"{column_names} are not in right dataframe columns. Can't vectorize."
+            )
+        # for now, fill NA with zeroes
+        full_df = pd.concat([left_df, right_df]).fillna(0)
+        if not pd.to_numeric(full_df, errors="coerce").notnull().all():
+            raise AssertionError(
+                f"There are non-numeric values in the {column_names} columns."
+            )
+        # TODO: make this a pipeline
+        left_array = left_df.fillna(0).to_numpy().reshape(-1, 1)
+        right_array = right_df.fillna(0).to_numpy().reshape(-1, 1)
+        scaler = MinMaxScaler(feature_range=feature_range)
+        scaler.fit(full_df)
+        left_array = scaler.transform(left_array)
+        right_array = scaler.transform(right_array)
+        norm = Normalizer()
+        left_df[column_names] = norm.transform(left_array)
+        right_df[column_names] = norm.transform(right_array)
+        for col in column_names:
+            self.left_embedding_attribute_dict[col] = left_df[col]
+            self.right_embedding_attribute_dict[col] = right_df[col]
 
     def equal_weight_aggregate(self, embedded_attribute_dict: dict):
         """Equally weight and combine attribute embedding vectors into tuple embeddings.

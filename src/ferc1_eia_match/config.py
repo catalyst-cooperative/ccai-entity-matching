@@ -8,8 +8,8 @@ from pydantic import BaseModel
 class Inputs(BaseModel):
     """Configuration for input resources."""
 
-    start_year: int
-    end_year: int
+    start_year: int | None = None
+    end_year: int | None = None
 
 
 class ColumnEmbedding(BaseModel):
