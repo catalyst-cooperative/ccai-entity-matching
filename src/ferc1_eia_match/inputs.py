@@ -7,6 +7,7 @@ import sqlalchemy as sa
 
 import pudl
 from ferc1_eia_match.name_cleaner import CompanyNameCleaner
+from pudl.etl import defs
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,6 @@ class InputManager:
         )
         self.eia_df = None
         self.ferc1_df = None
-        self.non_distinct_plant_parts_eia = None
         if (
             eia_plant_part is not None
             and eia_plant_part not in pudl.analysis.plant_parts_eia.PLANT_PARTS
@@ -133,6 +133,15 @@ class InputManager:
             inplace=True,
         )
         return df
+
+    def _get_null_fill_dict(self, df: pd.DataFrame) -> dict:
+        """Get a dictionary to fill null strings and numeric columns."""
+        str_cols = df.select_dtypes("string").columns
+        num_cols = df.select_dtypes(["Int64", "float64"]).columns
+        null_fill_dict = {col: "" for col in str_cols}
+        # TODO: fill with median instead?
+        null_fill_dict.update({col: 0 for col in num_cols})
+        return null_fill_dict
 
     def get_ferc_input(self) -> pd.DataFrame:
         """Get the FERC 1 plants data from PUDL and prepare for matching.
@@ -208,8 +217,9 @@ class InputManager:
             )
             .pipe(self.fill_fuel_type_from_name)
             .pipe(self.match_installation_construction_year)
-        )
-
+        ).astype({"plant_name": "string", "utility_name": "string"})
+        null_fill_dict = self._get_null_fill_dict(plants_ferc1_df)
+        plants_ferc1_df = plants_ferc1_df.fillna(null_fill_dict)
         self.ferc1_df = plants_ferc1_df
         return plants_ferc1_df
 
@@ -223,17 +233,7 @@ class InputManager:
         add on utlity name.
         """
         logger.info("Creating the EIA plant parts list input.")
-        plant_parts_eia = self.pudl_out.plant_parts_eia(
-            update=update, update_gens_mega=update
-        )
-        # a little patch, this might not be needed anymore
-        plant_parts_eia = plant_parts_eia[
-            ~plant_parts_eia.index.duplicated(keep="first")
-        ]
-
-        # TODO: don't save this variable once PPE is dagsterized
-        # used for train connections
-        self.non_distinct_plant_parts_eia = plant_parts_eia
+        plant_parts_eia = defs.load_asset_value("plant_parts_eia")
         # make plant_parts_eia distinct
         plant_parts_eia = plant_parts_eia[
             (plant_parts_eia["true_gran"]) & (~plant_parts_eia["ownership_dupe"])
@@ -245,8 +245,7 @@ class InputManager:
             ]
         # add on utility name
         # TODO: use entity table or glue table for utility names?
-        eia_util = pd.read_sql("utilities_eia", self.pudl_out.pudl_engine)
-        # eia_util = self.pudl_out.utils_eia860()
+        eia_util = defs.load_asset_value("utilities_entity_eia")
         eia_util = eia_util.set_index("utility_id_eia")["utility_name_eia"]
         non_null_df = plant_parts_eia[~(plant_parts_eia.utility_id_eia.isnull())]
         non_null_df = non_null_df.merge(
@@ -258,7 +257,7 @@ class InputManager:
         )
         plant_parts_eia = pd.concat(
             [non_null_df, plant_parts_eia[plant_parts_eia.utility_id_eia.isnull()]]
-        ).reindex(plant_parts_eia.index)
+        )
         plant_parts_eia = plant_parts_eia.astype(
             {
                 "plant_name_eia": "string",
@@ -282,21 +281,19 @@ class InputManager:
             .pipe(self.plant_name_cleaner.get_clean_df, "plant_name_eia", "plant_name")
             .pipe(self.fill_fuel_type_from_name)
             .pipe(self.match_installation_construction_year)
-        )
+        ).astype({"plant_name": "string", "utility_name": "string"})
+        null_fill_dict = self._get_null_fill_dict(plant_parts_eia)
+        plant_parts_eia = plant_parts_eia.fillna(null_fill_dict)
         self.eia_df = plant_parts_eia
 
         return plant_parts_eia
 
-    def get_training_data(self, plant_parts_eia: pd.DataFrame | None = None):
+    def get_training_data(self):
         """Get FERC1 to EIA training data from PUDL analysis module.
 
         FERC1 records will be matched to their true granulity EIA match and training
         data will be restricted to the data range defined by ``start_report_year`` and
         ``end_report_year``.
-
-        Arguments:
-            plant_parts_eia: Optionally pass in the plant parts list (non distinct).
-                Otherwise, it is generated in ``get_eia_input``.
 
         Returns:
             train_df: Training data connected at the true granularity with columns
@@ -305,22 +302,13 @@ class InputManager:
         """
         # TODO: when PPE is dagsterized just grab it from the DB
         # get training data connected at the true granularity
-        if plant_parts_eia is not None:
-            train_df = pudl.analysis.ferc1_eia.prep_train_connections(
-                self.non_distinct_plant_parts_eia,
-                start_date=self.start_date,
-                end_date=self.end_date,
-            ).reset_index()
-        else:
-            if self.non_distinct_plant_parts_eia is None:
-                self.get_eia_input()
-            train_df = pudl.analysis.ferc1_eia.prep_train_connections(
-                self.non_distinct_plant_parts_eia,
-                start_date=self.start_date,
-                end_date=self.end_date,
-            ).reset_index()
+        train_df = pudl.analysis.ferc1_eia_record_linkage.prep_train_connections(
+            self.pudl_out.plant_parts_eia(),
+            start_date=self.start_date,
+            end_date=self.end_date,
+        ).reset_index()
 
-        train_df = pudl.analysis.ferc1_eia.restrict_train_connections_on_date_range(
+        train_df = pudl.analysis.ferc1_eia_record_linkage.restrict_train_connections_on_date_range(
             train_df,
             "record_id_eia",
             start_date=self.start_date,

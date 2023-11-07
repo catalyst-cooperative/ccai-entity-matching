@@ -4,11 +4,9 @@ import logging
 import faiss
 import numpy as np
 import pandas as pd
-from scipy.sparse import hstack, issparse
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import MinMaxScaler, Normalizer, OneHotEncoder
-
-from ferc1_eia_match.config import ColumnEmbedding
+from scipy.sparse import issparse
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -16,19 +14,11 @@ logger = logging.getLogger(__name__)
 class DataframeEmbedder:
     """A class for creating an embedding matrix for one dataframe or a pair of dataframes."""
 
-    # TODO: dynamically generate based on functions in superclass?
-    column_embedding_functions = [
-        "min_max_scale",
-        "tfidf_vectorize",
-        "one_hot_encode",
-        "min_max_scale_normalize_df",
-    ]
-
     def __init__(
         self,
         left_df: pd.DataFrame,
-        embedding_map: dict[str, ColumnEmbedding],
-        # embedding_map: Type[EmbeddingConfig.embedding_map],
+        column_transformers: list[tuple],
+        blocking_col: str = "",
         right_df: pd.DataFrame = pd.DataFrame(),
     ):
         """Initialize a dataframe embedder object to vectorize one or two dataframe.
@@ -41,192 +31,30 @@ class DataframeEmbedder:
             left_df: The left dataframe to be embedded. If no ``right_df`` is given, then this
                 is the only dataframe that will be embedded. The index should be the default,
                 numeric index.
-            embedding_map: A dictionary specifying the functions for embedding each column
-                in the dataframe or dataframes and the keyword arguments for the function.
-                All columns that are to be vectorized must be keys in the dictionary. Values are a
-                dictionary where the key ``embedding_type`` specifies the embedding function name
-                and ``options`` is a dictionary of keyword arguments for the function, if any.
-                ``DataframeEmbedder.get_column_embedding_function_name`` gives valid function names.
+            column_transformers: List of (name, transformer, columns) tuples specifying the
+                transformer objects to be applied for embedding each column in the dataframe or
+                dataframes. Transformers must have a fit and transform method. Used as the
+                transformers list input to ``sklearn.compose.ColumnTransformer``.
+            blocking_col: The name of the column to get blocks of indices of the
+                dataframes. Default is the empty string if no manual blocking on
+                the value of a column is to be performed. Passing a blocking column
+                will not modify the dataframes themselves, just set the respective
+                dictionary of blocks.
             right_df: The right dataframe to be embedded. If it's an empty dataframe, then
                 only ``left_df`` will be embedded. The index should be the default, numeric
                 index.
         """
         self.left_df = left_df.copy()
         self.right_df = right_df.copy()
-        self.embedding_map = embedding_map
-        self.left_embedding_attribute_dict: dict[str, np.ndarray] = {}
-        self.right_embedding_attribute_dict: dict[str, np.ndarray] = {}
+        self.column_transformers = column_transformers
+        self.blocking_col = blocking_col
+        self.column_weights = None
         self.left_embedding_matrix: np.ndarray | None = None
         self.right_embedding_matrix: np.ndarray | None = None
-        self.blocking_col: str = ""
         self.left_blocks_dict: dict[str, list] = {}
         self.right_blocks_dict: dict[str, list] = {}
-        # TODO: incorporate dictionary for choosing how to handle nulls
-        # self.null_handling_dict = null_handling_dict
 
-    # TODO: make a superclass for these embedding functions
-    def one_hot_encode(self, column_name: str, kwargs: dict = {}) -> None:
-        """Column embedding function: One hot encode a column.
-
-        Arguments:
-            column_name: Name of the column in the dataframe to vectorize.
-            kwargs: Keyword arguments for the sklearn OneHotEncoder object.
-        """
-        logger.info(f"One hot encoding {column_name}.")
-        # fill nulls with the empty string so they become 0 vectors
-        if column_name in self.left_df.columns:
-            left_series = self.left_df[column_name].fillna("")
-        else:
-            raise AssertionError(
-                f"{column_name} is not in left dataframe columns. Can't vectorize."
-            )
-        if self.right_df.empty:
-            right_series = pd.Series()
-        elif column_name in self.right_df.columns:
-            right_series = self.right_df[column_name].fillna("")
-        else:
-            raise AssertionError(
-                f"{column_name} is not in right dataframe columns. Can't vectorize."
-            )
-        encoder = OneHotEncoder(**kwargs)
-        encoder.fit(pd.concat([left_series, right_series]))
-        self.left_embedding_attribute_dict[column_name] = encoder.transform(left_series)
-        self.right_embedding_attribute_dict[column_name] = encoder.transform(
-            right_series
-        )
-
-    def tfidf_vectorize(self, column_name: str, kwargs: dict = {}) -> None:
-        """Column embedding function: Use TF-IDF to create vector embeddings for a column.
-
-        Arguments:
-            column_name: Name of the column in the dataframe to vectorize.
-            kwargs: Keyword arguments for the sklearn TfidfVectorizer object.
-        """
-        # fill nulls with the empty string so they become 0 vectors
-        logger.info(f"Converting {column_name} to TF-IDF features.")
-        if column_name in self.left_df.columns:
-            left_series = self.left_df[column_name].fillna("")
-        else:
-            raise AssertionError(
-                f"{column_name} is not in left dataframe columns. Can't vectorize."
-            )
-        if self.right_df.empty:
-            right_series = pd.Series()
-        elif column_name in self.right_df.columns:
-            right_series = self.right_df[column_name].fillna("")
-        else:
-            raise AssertionError(
-                f"{column_name} is not in right dataframe columns. Can't vectorize."
-            )
-        vectorizer = TfidfVectorizer(**kwargs)
-        vectorizer.fit(pd.concat([left_series, right_series]))
-        self.left_embedding_attribute_dict[column_name] = vectorizer.transform(
-            left_series
-        )
-        self.right_embedding_attribute_dict[column_name] = vectorizer.transform(
-            right_series
-        )
-
-    def min_max_scale(self, column_name: str, feature_range: tuple = (0, 1)) -> None:
-        """Column embedding function: Scale numeric column between a range.
-
-        Arguments:
-            column_name: the name of the column in the left and right dataframes
-                to scale to the feature range.
-            feature_range: The desired range of the transformed data.
-        """
-        # fill nulls with the median
-        logger.info(f"Scaling {column_name} with MinMaxScaler.")
-        if column_name in self.left_df.columns:
-            left_series = self.left_df[column_name]
-        else:
-            raise AssertionError(
-                f"{column_name} is not in left dataframe columns. Can't vectorize."
-            )
-        if self.right_df.empty:
-            right_series = pd.Series()
-        elif column_name in self.right_df.columns:
-            right_series = self.right_df[column_name]
-        else:
-            raise AssertionError(
-                f"{column_name} is not in right dataframe columns. Can't vectorize."
-            )
-        full_series = pd.concat([left_series, right_series])
-        med = full_series.median()
-        full_series = full_series.fillna(med)
-        if not pd.to_numeric(full_series, errors="coerce").notnull().all():
-            raise AssertionError(
-                f"There are non-numeric values in the {column_name} column."
-            )
-        full_array = full_series.to_numpy().reshape(-1, 1)
-        left_array = left_series.fillna(med).to_numpy().reshape(-1, 1)
-        right_array = right_series.fillna(med).to_numpy().reshape(-1, 1)
-        scaler = MinMaxScaler(feature_range=feature_range)
-        scaler.fit(full_array)
-        self.left_embedding_attribute_dict[column_name] = scaler.transform(left_array)
-        self.right_embedding_attribute_dict[column_name] = scaler.transform(right_array)
-
-    def min_max_scale_normalize_df(
-        self, column_names: list[str], feature_range: tuple = (0, 1)
-    ):
-        """Min max scale a set of columns and then normalize records composed of the columns.
-
-        Arguments:
-            column_names: A list of the names of the columns in the left and right
-                dataframes to scale to the feature range.
-            feature_range: The desired range of the transformed data.
-        """
-        if set(column_names).issubset(self.left_df.columns):
-            left_df = self.left_df[column_names]
-        else:
-            raise AssertionError(
-                f"{column_names} are not in left dataframe columns. Can't vectorize."
-            )
-        if self.right_df.empty:
-            right_df = pd.DataFrame()
-        elif set(column_names).issubset(self.right_df.columns):
-            right_df = self.right_df[column_names]
-        else:
-            raise AssertionError(
-                f"{column_names} are not in right dataframe columns. Can't vectorize."
-            )
-        # for now, fill NA with zeroes
-        full_df = pd.concat([left_df, right_df]).fillna(0)
-        if not pd.to_numeric(full_df, errors="coerce").notnull().all():
-            raise AssertionError(
-                f"There are non-numeric values in the {column_names} columns."
-            )
-        # TODO: make this a pipeline
-        left_array = left_df.fillna(0).to_numpy().reshape(-1, 1)
-        right_array = right_df.fillna(0).to_numpy().reshape(-1, 1)
-        scaler = MinMaxScaler(feature_range=feature_range)
-        scaler.fit(full_df)
-        left_array = scaler.transform(left_array)
-        right_array = scaler.transform(right_array)
-        norm = Normalizer()
-        left_df[column_names] = norm.transform(left_array)
-        right_df[column_names] = norm.transform(right_array)
-        for col in column_names:
-            self.left_embedding_attribute_dict[col] = left_df[col]
-            self.right_embedding_attribute_dict[col] = right_df[col]
-
-    def equal_weight_aggregate(self, embedded_attribute_dict: dict):
-        """Equally weight and combine attribute embedding vectors into tuple embeddings.
-
-        All matrices in ``embedded_attribute_dict`` must have the same number of rows.
-
-        Arguments:
-            embedded_attribute_dict: Dictionary where the keys are attribute names and the
-                values are the matrix embeddings for the attributes that are to be concatenated
-                together
-        Returns:
-            Matrix of the attribute matrices concatenated together horizontally.
-        """
-        tuple_embedding = hstack(list(embedded_attribute_dict.values()))
-        tuple_embedding = tuple_embedding.tocsr()
-        return tuple_embedding
-
-    def set_col_blocks(self, blocking_col: str) -> None:
+    def set_col_blocks(self) -> None:
         """Get the indices of blocks of records in a dataframe for a blocking column.
 
         Get blocks of records in a dataframe where the value of the ``blocking_col``
@@ -238,52 +66,41 @@ class DataframeEmbedder:
         Arguments:
             blocking_col: The name of the column to block on.
         """
-        self.blocking_col = blocking_col
-        if blocking_col in self.left_df.columns:
-            self.left_blocks_dict = self.left_df.groupby(blocking_col).groups
-        if blocking_col in self.right_df.columns:
-            self.right_blocks_dict = self.right_df.groupby(blocking_col).groups
+        if self.blocking_col in self.left_df.columns:
+            self.left_blocks_dict = self.left_df.groupby(self.blocking_col).groups
+        if self.blocking_col in self.right_df.columns:
+            self.right_blocks_dict = self.right_df.groupby(self.blocking_col).groups
 
-    def get_column_embedding_function_names(self) -> list[str]:
-        """Get the names of functions that can be used to vectorize a column."""
-        return self.column_embedding_functions
-
-    def embed_dataframes(self, blocking_col: str = "") -> None:
+    def embed_dataframes(self) -> None:
         """Embed left (and right) dataframes and create blocks from a column.
 
         Set `self.left_embedding_matrix` and `self.right_embedding_matrix` with
         matrix embeddings for `self.left_df` and `self.right_df`. Embed attributes
-        based on the ``embedding_type`` functions for each column in `self.embedding_map`.
-        Concatenate the embeddings for each column together into one embedding
-        matrix for each dataframe. Optionally set `self.left_blocks_dict` and
-        ``self.right_blocks_dict`` to be the indices of blocks within ``blocking_col``.
-
-        Arguments:
-            blocking_col: The name of the column to get blocks of indices of the
-                dataframes. Default is the empty string if no manual blocking on
-                the value of a column is to be performed. Passing a blocking column
-                will not modify the dataframes themselves, just set the respective
-                dictionary of blocks.
+        based on the transformer pipeline in `self.embedding_transformers`.
+        Optionally set `self.left_blocks_dict` and ``self.right_blocks_dict``
+        to be the indices of blocks within ``blocking_col``.
         """
-        for column_name in self.embedding_map:
-            vectorizer = self.embedding_map[column_name].embedding_type
-            kwargs = self.embedding_map[column_name].options
-            if hasattr(self, vectorizer):
-                vectorizer_func = getattr(self, vectorizer)
-                vectorizer_func(column_name=column_name, **kwargs)
-            else:
-                raise ValueError(
-                    f"Vectorizing function {vectorizer} for {column_name} column does not exist."
-                )
-        # TODO: allow for other types of aggregation
-        self.left_embedding_matrix = self.equal_weight_aggregate(
-            self.left_embedding_attribute_dict
+        embedder = Pipeline(
+            [
+                (
+                    "column_embedding",
+                    ColumnTransformer(
+                        transformers=self.column_transformers,
+                        transformer_weights=self.column_weights,
+                    ),
+                ),
+            ]
         )
-        self.right_embedding_matrix = self.equal_weight_aggregate(
-            self.right_embedding_attribute_dict
-        )
-        if blocking_col != "":
-            self.set_col_blocks(blocking_col=blocking_col)
+        if not self.right_df.empty:
+            concat_df = pd.concat([self.left_df, self.right_df])
+        else:
+            concat_df = self.left_df
+        embedder.fit(concat_df)
+        self.left_embedding_matrix = embedder.transform(self.left_df)
+        if not self.right_df.empty:
+            self.right_embedding_matrix = embedder.transform(self.right_df)
+        if self.blocking_col != "":
+            self.set_col_blocks()
         else:
             # if there's no blocking col, then there's just one block with all records
             self.left_blocks_dict["all records"] = self.left_df.reset_index(

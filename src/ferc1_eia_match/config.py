@@ -12,17 +12,10 @@ class Inputs(BaseModel):
     end_year: int | None = None
 
 
-class ColumnEmbedding(BaseModel):
-    """Specify embedding vectorizer to use for column and any options."""
-
-    embedding_type: str
-    options: dict = {}
-
-
 class EmbeddingConfig(BaseModel):
     """Configuration options for embed_dataframes."""
 
-    embedding_map: dict[str, ColumnEmbedding]
+    column_transformers: list[tuple]
     matching_cols: list[str]
     blocking_col: str = ""
 
