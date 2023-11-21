@@ -70,6 +70,12 @@ class DataframeEmbedder:
             self.left_blocks_dict = self.left_df.groupby(self.blocking_col).groups
         if self.blocking_col in self.right_df.columns:
             self.right_blocks_dict = self.right_df.groupby(self.blocking_col).groups
+            # TODO: do this better
+            shared_keys = list(
+                self.left_blocks_dict.keys() & self.right_blocks_dict.keys()
+            )
+            self.left_blocks_dict = {k: self.left_blocks_dict[k] for k in shared_keys}
+            self.right_blocks_dict = {k: self.right_blocks_dict[k] for k in shared_keys}
 
     def embed_dataframes(self) -> None:
         """Embed left (and right) dataframes and create blocks from a column.
