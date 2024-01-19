@@ -94,11 +94,11 @@ class InputManager:
         """
         if "fuel_type_code_pudl" not in df.columns:
             raise AssertionError("fuel_type_code_pudl is not in dataframe columns.")
-        with self.pudl_engine.connect() as conn:
-            ftcp = conn.execute(
-                "SELECT DISTINCT fuel_type_code_pudl FROM energy_sources_eia"
-            )
-            fuel_type_list = [fuel[0] for fuel in ftcp]
+        fuel_type_list = pd.read_sql(
+            "SELECT DISTINCT fuel_type_code_pudl FROM energy_sources_eia",
+            self.pudl_engine,
+        )["fuel_type_code_pudl"].tolist()
+        # fuel_type_list = [fuel[0] for fuel in ftcp]
         fuel_type_map = {fuel_type: fuel_type for fuel_type in fuel_type_list}
         fuel_type_map.update(
             {
@@ -161,10 +161,13 @@ class InputManager:
             "fuel_mmbtu",
             "primary_fuel_by_mmbtu",
         ]
+        # TODO: get rid of pudl_out
         plants_ferc1_df = (
-            self.pudl_out.plants_all_ferc1()
+            defs.load_asset_value("out_ferc1__yearly_all_plants")
             .merge(
-                self.pudl_out.fbp_ferc1()[fbp_cols_to_use],
+                defs.load_asset_value(
+                    "out_ferc1__yearly_steam_plants_fuel_by_plant_sched402"
+                )[fbp_cols_to_use],
                 on=[
                     "report_year",
                     "utility_id_ferc1",
@@ -203,6 +206,10 @@ class InputManager:
             )
             .set_index("record_id_ferc1")
         )
+        plants_ferc1_df = plants_ferc1_df[
+            (plants_ferc1_df["report_year"] >= pd.Timestamp(self.start_date).year)
+            & (plants_ferc1_df["report_year"] <= pd.Timestamp(self.end_date).year)
+        ]
         # nullify negative capacity and round values
         plants_ferc1_df.loc[plants_ferc1_df.capacity_mw <= 0, "capacity_mw"] = None
         plants_ferc1_df = plants_ferc1_df.round({"capacity_mw": 2})
@@ -223,7 +230,7 @@ class InputManager:
         self.ferc1_df = plants_ferc1_df
         return plants_ferc1_df
 
-    def get_eia_input(self, update: bool = False) -> pd.DataFrame:
+    def get_eia_input(self) -> pd.DataFrame:
         """Get the distinct EIA plant parts list from PUDL and prepare for matching.
 
         The distinct plant parts list includes only the true granularities of plant part
@@ -233,7 +240,14 @@ class InputManager:
         add on utlity name.
         """
         logger.info("Creating the EIA plant parts list input.")
-        plant_parts_eia = defs.load_asset_value("plant_parts_eia")
+        plant_parts_eia = pudl.metadata.classes.Resource.from_id(
+            "out_eia__yearly_plant_parts"
+        ).format_df(
+            pd.read_sql(
+                f"SELECT * FROM out_eia__yearly_plant_parts WHERE report_date between '{self.start_date}' and '{self.end_date}'",
+                self.pudl_engine,
+            )
+        )
         # make plant_parts_eia distinct
         plant_parts_eia = plant_parts_eia[
             (plant_parts_eia["true_gran"]) & (~plant_parts_eia["ownership_dupe"])
@@ -244,8 +258,11 @@ class InputManager:
                 plant_parts_eia.plant_part == self.eia_plant_part
             ]
         # add on utility name
-        # TODO: use entity table or glue table for utility names?
-        eia_util = defs.load_asset_value("utilities_entity_eia")
+        eia_util = pudl.metadata.classes.Resource.from_id(
+            "out_eia__yearly_utilities"
+        ).format_df(
+            pd.read_sql("SELECT * FROM out_eia__yearly_utilities", self.pudl_engine)
+        )
         eia_util = eia_util.set_index("utility_id_eia")["utility_name_eia"]
         non_null_df = plant_parts_eia[~(plant_parts_eia.utility_id_eia.isnull())]
         non_null_df = non_null_df.merge(
@@ -302,13 +319,16 @@ class InputManager:
         """
         # TODO: when PPE is dagsterized just grab it from the DB
         # get training data connected at the true granularity
-        train_df = pudl.analysis.ferc1_eia_record_linkage.prep_train_connections(
-            self.pudl_out.plant_parts_eia(),
+        plant_parts_eia = defs.load_asset_value("out_eia__yearly_plant_parts")
+        if "record_id_eia" in plant_parts_eia.columns:
+            plant_parts_eia = plant_parts_eia.set_index("record_id_eia")
+        train_df = pudl.analysis.record_linkage.eia_ferc1_record_linkage.prep_train_connections(
+            plant_parts_eia,
             start_date=self.start_date,
             end_date=self.end_date,
         ).reset_index()
 
-        train_df = pudl.analysis.ferc1_eia_record_linkage.restrict_train_connections_on_date_range(
+        train_df = pudl.analysis.record_linkage.eia_ferc1_record_linkage.restrict_train_connections_on_date_range(
             train_df,
             "record_id_eia",
             start_date=self.start_date,
