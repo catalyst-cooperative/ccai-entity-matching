@@ -1,4 +1,5 @@
 """Script to compare sets of metrics."""
+
 import argparse
 import sys
 from pathlib import Path
