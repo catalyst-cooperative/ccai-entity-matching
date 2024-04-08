@@ -1,4 +1,5 @@
 """Blocking methods to create a candidate set of tuples matches."""
+
 import logging
 
 import faiss

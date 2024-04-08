@@ -1,4 +1,5 @@
 """Helper functions to compute and output various metrics."""
+
 from __future__ import annotations
 
 import importlib.resources

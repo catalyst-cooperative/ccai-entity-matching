@@ -1,4 +1,5 @@
 """Script to execute experiments and save metrics."""
+
 import argparse
 import logging
 import sys

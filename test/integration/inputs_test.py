@@ -1,4 +1,5 @@
 """Test that the EIA and FERC data inputs can be generated."""
+
 import pytest
 import sqlalchemy as sa
 

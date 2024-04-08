@@ -1,4 +1,5 @@
 """Test that jupyter notebooks can be run."""
+
 from pathlib import Path
 
 import nbformat
