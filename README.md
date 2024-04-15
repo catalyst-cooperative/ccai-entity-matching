@@ -1,3 +1,6 @@
+# Update 
+The work in this repo has been concluded. If you're interested in what we did, check out Catalyst's primary open source data project, the Public Utility Data Liberation project (PUDL). The PUDL [record linkage module](https://github.com/catalyst-cooperative/pudl/tree/main/src/pudl/analysis/record_linkage) contains the entity matching modeling framework build with the help of this CCAI Innovation Grant. You can also read [this blog post](https://catalyst.coop/2024/04/15/entity-matching-with-splink-to-connect-ferc-to-eia/) for a summary of the modeling and results.
+
 # Overview
 
 The entity matching process breaks down into two steps: blocking and matching.
